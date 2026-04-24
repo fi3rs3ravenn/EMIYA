@@ -126,8 +126,7 @@ The full 12-week build plan lives in [`SPRINT_ROADMAP.md`](./SPRINT_ROADMAP.md).
 | **06** | Custom skills · community feedback · retrospective | `[ optional ]` |
 
 Live progress, dev-log, and design documents:
-[**→ EMIYA notion workspace**](https://notion.so/your-link-here) *(replace with your actual notion public link)*
-
+[**→ EMIYA notion workspace**](https://pond-calliandra-6e3.notion.site/EMIYA-dev-log-34c540076ff6803ab981cd626ee05ab7?pvs=74)
 ---
 
 ## `05_features`
@@ -271,10 +270,9 @@ Created and maintained by **secret info**.
 
 - github:     [`@fi3rs3ravenn`](https://github.com/fi3rs3ravenn)
 - telegram:   [`@c0ffee_lover`](https://t.me/c0ffee_lover)
-- notion:     [dev workspace](https://www.notion.so/main-plan-34c540076ff680c3838bc3a938a1808b?source=copy_link)
+- notion:     [dev workspace](https://pond-calliandra-6e3.notion.site/EMIYA-dev-log-34c540076ff6803ab981cd626ee05ab7?pvs=74)
 - email:      `firceraven@gmail.com`
 
-> replace the placeholder links above with your actual ones before pushing.
 
 ---
 
