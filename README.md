@@ -201,7 +201,7 @@ L2 (Claude API) runs in the cloud — only an Anthropic API key is required, no 
 
 ```bash
 # 01. clone
-git clone https://github.com/fi3rs3ravenn/EMIYA.git
+git clone git clone https://github.com/naevor/EMIYA.git
 cd EMIYA
 
 # 02. install Ollama and pull required models
@@ -268,19 +268,20 @@ Built on the shoulders of:
 
 Created and maintained by **secret info**.
 
-- github:     [`@fi3rs3ravenn`](https://github.com/fi3rs3ravenn)
+- github:     [`@naevor`](https://github.com/naevor)
 - telegram:   [`@c0ffee_lover`](https://t.me/c0ffee_lover)
 - notion:     [dev workspace](https://pond-calliandra-6e3.notion.site/EMIYA-dev-log-34c540076ff6803ab981cd626ee05ab7?pvs=74)
-- email:      `firceraven@gmail.com`
 
 
 ---
 
 ## `11_license`
 
-All Rights Reserved. Use her. Fork her. Build your own weird companions.
-Just don't pretend she's conscious — she isn't, and neither are we sure what that would mean.
+MIT — see [LICENSE](./LICENSE) for details.
 
+Use her. Fork her. Build your own weird companions.
+Just don't pretend she's conscious — she isn't, and neither 
+are we sure what that would mean.
 ---
 
 <div align="center">
