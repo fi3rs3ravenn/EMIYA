@@ -1,10 +1,9 @@
-import time
+import random
 from datetime import datetime, timedelta
 from monitor.db import log_trigger, get_connection
 
-COOLDOWN_MINUTES = 45
+COOLDOWN_MINUTES = 30
 
-# fallback фразы если L0 недоступна
 FALLBACK_LINES = {
     "grinding":            ["долго работаешь. что держит?", "уже давно. всё нормально?"],
     "late_night_grinding": ["поздно и долго. зачем?", "ночью работается лучше — или не можешь остановиться?"],
@@ -15,32 +14,24 @@ FALLBACK_LINES = {
     "late_night":          ["поздно.", "всё ещё здесь."],
 }
 
-import random
 
 def get_fallback(trigger):
     lines = FALLBACK_LINES.get(trigger, ["..."])
     return random.choice(lines)
 
-def get_last_trigger_time():
-    conn = get_connection()
-    c    = conn.cursor()
-    c.execute("SELECT timestamp FROM trigger_log ORDER BY timestamp DESC LIMIT 1")
-    row = c.fetchone()
-    conn.close()
-    return datetime.fromisoformat(row["timestamp"]) if row else None
-
-def is_on_cooldown():
-    last = get_last_trigger_time()
-    if not last:
-        return False
-    return (datetime.now() - last) < timedelta(minutes=COOLDOWN_MINUTES)
 
 class TriggerEngine:
     def __init__(self, session_id, on_trigger=None):
-        self.session_id  = session_id
-        self.on_trigger  = on_trigger
-        self.fired_today = set()
-        self._l0         = None
+        self.session_id   = session_id
+        self.on_trigger   = on_trigger
+        self.fired_today  = set()
+        self._l0          = None
+        self._last_fired_at: datetime | None = None
+
+    def _is_on_cooldown(self) -> bool:
+        if self._last_fired_at is None:
+            return False
+        return (datetime.now() - self._last_fired_at) < timedelta(minutes=COOLDOWN_MINUTES)
 
     def _get_l0(self):
         if self._l0 is None:
@@ -51,7 +42,7 @@ class TriggerEngine:
                 self._l0 = False
         return self._l0 if self._l0 else None
 
-    def _generate_message(self, trigger, context):
+    def _generate_message(self, trigger: str, context: dict) -> str:
         l0 = self._get_l0()
         if l0:
             try:
@@ -62,8 +53,8 @@ class TriggerEngine:
                 print(f"[TriggerEngine] L0 недоступна: {e}")
         return get_fallback(trigger)
 
-    def check(self, states, session_stats):
-        if is_on_cooldown():
+    def check(self, states: set, session_stats: dict, mood: dict | None = None):
+        if self._is_on_cooldown():
             return None
 
         trigger = None
@@ -84,18 +75,25 @@ class TriggerEngine:
         if not trigger:
             return None
 
+        self._last_fired_at = datetime.now()
+        self.fired_today.add(trigger)
+
         context = {
             "states":     list(states),
             "active_min": minutes,
             "apps":       session_stats.get("apps", []),
             "hour":       hour,
+            "mood":       mood or {"energy": 0.5, "focus": 0.5, "openness": 0.5},
         }
 
         message = self._generate_message(trigger, context)
         log_trigger(trigger, message, self.session_id)
-        self.fired_today.add(trigger)
 
         if self.on_trigger:
             self.on_trigger(trigger, message)
 
+        print(f"[Trigger] {trigger} → {message}")
         return trigger, message
+
+    def reset_day(self):
+        self.fired_today.clear()
