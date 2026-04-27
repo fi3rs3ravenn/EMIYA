@@ -6,8 +6,6 @@ OLLAMA_URL   = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
 
-THINKING_ENABLED = False
-
 
 def _build_system(context: dict | None) -> str:
     system = SYSTEM_PROMPT
@@ -52,9 +50,6 @@ def chat(messages: list, context: dict = None) -> str | None:
         content = msg.get("content", "")
         prompt_messages.append({"role": role, "content": content})
 
-    # /no_think добавляется к последнему сообщению пользователя если thinking выключен
-    if not THINKING_ENABLED and prompt_messages and prompt_messages[-1]["role"] == "user":
-        prompt_messages[-1]["content"] += " /no_think"
 
     try:
         response = requests.post(
@@ -69,9 +64,10 @@ def chat(messages: list, context: dict = None) -> str | None:
                 "options": {
                     "temperature": 0.8,
                     "top_p":       0.9,
-                    "num_predict": 200,
+                    "num_predict": 2000,
+                    "thinking": False
                 }
-            }, timeout=60)   # qwen3:14b может думать дольше
+            }, timeout=90)   # qwen3:14b может думать дольше
 
         if response.status_code == 200:
             text = response.json().get("message", {}).get("content", "").strip()
