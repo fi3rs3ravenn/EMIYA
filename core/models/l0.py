@@ -80,7 +80,8 @@ def generate(trigger: str, context: dict) -> str | None:
             "options": {
                 "temperature": 0.85,
                 "top_p":       0.9,
-                "num_predict": 80,   # чуть больше запаса для qwen3
+                "num_predict": 100,   # чуть больше запаса для qwen3
+                "thinking": False,
             },
         }, timeout=20)
 
