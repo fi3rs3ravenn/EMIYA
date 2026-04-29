@@ -1,6 +1,7 @@
 import random
+import uuid
 from datetime import datetime, timedelta
-from monitor.db import log_trigger, get_connection
+from monitor.db import log_trigger, log_chat_message
 
 COOLDOWN_MINUTES = 30
 
@@ -42,16 +43,24 @@ class TriggerEngine:
                 self._l0 = False
         return self._l0 if self._l0 else None
 
-    def _generate_message(self, trigger: str, context: dict) -> str:
+    def _generate_message(self, trigger: str, context: dict) -> dict:
         l0 = self._get_l0()
         if l0:
             try:
-                msg = l0(trigger, context)
-                if msg:
-                    return msg
+                result = l0(trigger, context, return_metadata=True)
+                if isinstance(result, dict) and result.get("content"):
+                    return {
+                        "content": result["content"],
+                        "thought": result.get("thought"),
+                        "raw_response": result.get("raw_response"),
+                        "model": result.get("model"),
+                        "source": "l0_trigger",
+                    }
+                if isinstance(result, str) and result:
+                    return {"content": result, "source": "l0_trigger"}
             except Exception as e:
                 print(f"[TriggerEngine] L0 недоступна: {e}")
-        return get_fallback(trigger)
+        return {"content": get_fallback(trigger), "source": "fallback_trigger"}
 
     def check(self, states: set, session_stats: dict, mood: dict | None = None):
         if self._is_on_cooldown():
@@ -86,8 +95,22 @@ class TriggerEngine:
             "mood":       mood or {"energy": 0.5, "focus": 0.5, "openness": 0.5},
         }
 
-        message = self._generate_message(trigger, context)
+        turn_id = uuid.uuid4().hex
+        payload = self._generate_message(trigger, context)
+        message = payload["content"]
         log_trigger(trigger, message, self.session_id)
+        log_chat_message(
+            session_id=self.session_id,
+            role="assistant",
+            content=message,
+            source=payload.get("source", "l0_trigger"),
+            turn_id=turn_id,
+            thought=payload.get("thought"),
+            raw_response=payload.get("raw_response"),
+            model=payload.get("model"),
+            trigger=trigger,
+            mood=context.get("mood"),
+        )
 
         if self.on_trigger:
             self.on_trigger(trigger, message)
