@@ -1,18 +1,20 @@
 import asyncio
 import json
 import threading
+import uuid
 import websockets
 from datetime import datetime
-from monitor.db import init_db, start_session, end_session, log_state
+from monitor.db import init_db, start_session, log_state, log_chat_message
 from monitor.window_tracker import WindowTracker, get_app_time, get_switch_count
 from monitor.session_tracker import SessionTracker
 from monitor.system_tracker import SystemTracker
 from monitor.trigger_engine import TriggerEngine
 from mood.engine import MoodEngine
-from mood.modifiers import inject_mood
 
 HOST = "localhost"
 PORT = 7474
+BROADCAST_INTERVAL = 0.1
+MONITOR_INTERVAL   = 5.0
 
 GRINDING_MINUTES   = 120
 SCATTERED_SWITCHES = 5
@@ -47,6 +49,9 @@ class EmiyaServer:
         self.chat_history    = []
         self._l1             = None
         self._last_states    = set()          # чтобы не нагружать nudge каждые 5с
+        self._current_states = {"normal"}
+        self._current_apps   = []
+        self._current_stats  = self.session_tracker.get_stats()
 
     def get_l1(self):
         if self._l1 is None:
@@ -104,27 +109,65 @@ class EmiyaServer:
         self.last_sys = snapshot
 
     def handle_user_message(self, text):
+        turn_id = uuid.uuid4().hex
+        mood = self._mood_context()
         self.chat_history.append({"role": "user", "content": text})
+        log_chat_message(
+            session_id=self.session_id,
+            role="user",
+            content=text,
+            source="user",
+            turn_id=turn_id,
+            mood=mood,
+        )
 
         l1_fn = self.get_l1()
         if l1_fn:
             context = self._build_context()
             try:
                 # передаём текущий mood в context — L1 подхватит его сам
-                response = l1_fn(self.chat_history[-10:], context)
+                result = l1_fn(self.chat_history[-10:], context, return_metadata=True)
+                if isinstance(result, dict):
+                    response = result.get("content")
+                    thought = result.get("thought")
+                    raw_response = result.get("raw_response")
+                    model = result.get("model")
+                else:
+                    response = result
+                    thought = None
+                    raw_response = None
+                    model = None
                 if response:
                     self.chat_history.append({"role": "assistant", "content": response})
+                    log_chat_message(
+                        session_id=self.session_id,
+                        role="assistant",
+                        content=response,
+                        source="l1",
+                        turn_id=turn_id,
+                        thought=thought,
+                        raw_response=raw_response,
+                        model=model,
+                        mood=context.get("mood"),
+                    )
                     return response
             except Exception as e:
                 print(f"[L1] ошибка: {e}")
 
+        log_chat_message(
+            session_id=self.session_id,
+            role="assistant",
+            content="...",
+            source="fallback",
+            turn_id=turn_id,
+            mood=mood,
+        )
         return "..."
 
     def _build_context(self) -> dict:
         stats  = self.session_tracker.get_stats()
         states = self.analyze_state()
         apps   = get_app_time(self.session_id, minutes=30)
-        mood   = self.mood_engine.get_current()
 
         return {
             "time_of_day": stats["time_of_day"],
@@ -134,23 +177,27 @@ class EmiyaServer:
             "apps":        apps[:5],
             "cpu":         self.last_sys.get("cpu_percent", 0),
             "ram":         self.last_sys.get("ram_percent", 0),
-            "mood": {
-                "energy":   round(mood.energy, 3),
-                "focus":    round(mood.focus, 3),
-                "openness": round(mood.openness, 3),
-            },
+            "mood":        self._mood_context(),
         }
 
+    def _mood_context(self) -> dict:
+        mood = self.mood_engine.get_current()
+        return {
+            "energy":   round(mood.energy, 3),
+            "focus":    round(mood.focus, 3),
+            "openness": round(mood.openness, 3),
+        }
 
     def build_state_packet(self):
         stats      = self.session_tracker.get_stats()
-        states     = self.analyze_state()
-        apps       = get_app_time(self.session_id, minutes=30)
+        states     = self._current_states
+        apps       = self._current_apps
         mood_state = self.mood_engine.get_state()
 
         packet = {
             "type":        "state_update",
             "time":        datetime.now().strftime("%H:%M:%S"),
+            "timestamp":   datetime.now().isoformat(timespec="milliseconds"),
             "time_of_day": stats["time_of_day"],
             "active_min":  stats["active_minutes"],
             "is_afk":      stats["is_afk"],
@@ -161,6 +208,9 @@ class EmiyaServer:
             "emiya":       self.pending_message,
 
             "mood": {
+                "x":        round(mood_state.x, 4),
+                "y":        round(mood_state.y, 4),
+                "z":        round(mood_state.z, 4),
                 "energy":   round(mood_state.energy, 3),
                 "focus":    round(mood_state.focus, 3),
                 "openness": round(mood_state.openness, 3),
@@ -170,6 +220,7 @@ class EmiyaServer:
                 "sigma":    mood_state.sigma,
                 "rho":      mood_state.rho,
                 "beta":     round(mood_state.beta, 4),
+                "timestamp": mood_state.timestamp,
             },
             "trail": mood_state.trail[-200:],  # последние 200 точек для canvas
         }
@@ -226,21 +277,43 @@ class EmiyaServer:
             daemon=True
         ).start()
 
-    async def loop(self):
+    def monitor_tick(self):
+        self.session_tracker.ping()
+        states = self.analyze_state()
+        stats  = self.session_tracker.get_stats()
+        apps   = get_app_time(self.session_id, minutes=30)
+
+        self._current_states = states
+        self._current_stats  = stats
+        self._current_apps   = apps[:5]
+
+        for s in states:
+            log_state(s, self.session_id)
+
+        self.apply_mood_nudges(states)
+
+        trigger_context = {**stats, "apps": apps}
+        self.trigger_engine.check(
+            states,
+            trigger_context,
+            mood=self._mood_context(),
+        )
+
+    async def monitor_loop(self):
         while True:
-            self.session_tracker.ping()
-            states = self.analyze_state()
-            stats  = self.session_tracker.get_stats()
+            await asyncio.to_thread(self.monitor_tick)
+            await asyncio.sleep(MONITOR_INTERVAL)
 
-            for s in states:
-                log_state(s, self.session_id)
+    async def broadcast_loop(self):
+        while True:
+            await self.broadcast(self.build_state_packet())
+            await asyncio.sleep(BROADCAST_INTERVAL)
 
-            self.apply_mood_nudges(states)
-
-            self.trigger_engine.check(states, stats)
-            packet = self.build_state_packet()
-            await self.broadcast(packet)
-            await asyncio.sleep(5)
+    async def loop(self):
+        await asyncio.gather(
+            self.monitor_loop(),
+            self.broadcast_loop(),
+        )
 
     async def main(self):
         self.run_trackers()
