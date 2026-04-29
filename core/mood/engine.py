@@ -1,6 +1,7 @@
 import asyncio
 from collections import deque
 from dataclasses import dataclass, asdict
+from datetime import datetime
 
 from mood.lorenz import LorenzAttractor, MoodVector, PRESETS
 
@@ -18,12 +19,16 @@ class EngineState:
     energy:   float
     focus:    float
     openness: float
+    x:        float
+    y:        float
+    z:        float
     raw_x:    float
     raw_y:    float
     raw_z:    float
     sigma:    float
     rho:      float
     beta:     float
+    timestamp: str
     trail:    list[dict]    # последние TRAIL_SIZE точек {x, y, z}
 
     def to_dict(self) -> dict:
@@ -51,16 +56,21 @@ class MoodEngine:
         return self._current
 
     def get_state(self) -> EngineState:
+        now = self._timestamp()
         return EngineState(
             energy   = self._current.energy,
             focus    = self._current.focus,
             openness = self._current.openness,
+            x        = self._current.raw_x,
+            y        = self._current.raw_y,
+            z        = self._current.raw_z,
             raw_x    = self._current.raw_x,
             raw_y    = self._current.raw_y,
             raw_z    = self._current.raw_z,
             sigma    = self._attractor.sigma,
             rho      = self._attractor.rho,
             beta     = self._attractor.beta,
+            timestamp= now,
             trail    = list(self._trail),
         )
 
@@ -102,7 +112,15 @@ class MoodEngine:
                 "x": round(mood.raw_x, 4),
                 "y": round(mood.raw_y, 4),
                 "z": round(mood.raw_z, 4),
+                "energy": round(mood.energy, 4),
+                "focus": round(mood.focus, 4),
+                "openness": round(mood.openness, 4),
+                "timestamp": self._timestamp(),
             })
+
+    @staticmethod
+    def _timestamp() -> str:
+        return datetime.now().isoformat(timespec="milliseconds")
 
 if __name__ == "__main__":
     import time
