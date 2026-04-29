@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:ui": "vite --host 127.0.0.1 --port 5173",
+    "dev:backend": "python core/server.py",
+    "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev/stop-dev.ps1",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
