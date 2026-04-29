@@ -16,12 +16,13 @@ const C = {
   amber:      "#FFB000",
 };
 
-// ── ASCII палитра для trail (от старого к новому) ──────────────────────────
-const ASCII_TRAIL = ["·", "∙", "•", "●"];
+// ASCII палитра для trail (от старого к новому)
+const ASCII_TRAIL = ["░", "▒", "▓", "█"];
 const ASCII_COLS  = 40;
 const ASCII_ROWS  = 20;
+const MOOD_CANVAS_SIZE = 240;
 
-// ── локальная Lorenz симуляция (fallback пока нет данных с сервера) ─────────
+// локальная Lorenz симуляция (fallback пока нет данных с сервера)
 function lorenzStepRK4(x, y, z, sigma, rho, beta, dt = 0.01) {
   const d = (x, y, z) => [
     sigma * (y - x),
@@ -39,58 +40,87 @@ function lorenzStepRK4(x, y, z, sigma, rho, beta, dt = 0.01) {
   ];
 }
 
-// ── Canvas renderer ────────────────────────────────────────────────────────
-function drawCanvas(ctx, trail, localState, W, H) {
-  ctx.fillStyle = "rgba(5,5,5,0.06)";
-  ctx.fillRect(0, 0, W, H);
-
-  const pts = trail.length > 0 ? trail : null;
-  const cx = W / 2;
-  const cy = H / 2;
-
-  if (pts && pts.length > 1) {
-    // рисуем trail с сервера
-    const len = pts.length;
-    for (let i = 1; i < len; i++) {
-      const t     = i / len;
-      const alpha = t * 0.6;
-      const pt    = pts[i];
-      const prev  = pts[i - 1];
-      ctx.beginPath();
-      ctx.strokeStyle = `rgba(255,176,0,${alpha})`;
-      ctx.lineWidth   = t > 0.85 ? 1.2 : 0.5;
-      ctx.moveTo(cx + prev.x * 4, cy + prev.z * 3 - 80);
-      ctx.lineTo(cx + pt.x   * 4, cy + pt.z   * 3 - 80);
-      ctx.stroke();
-    }
-    // текущая точка — пульсирует
-    const last = pts[pts.length - 1];
-    const px   = cx + last.x * 4;
-    const py   = cy + last.z * 3 - 80;
-    const glow = ctx.createRadialGradient(px, py, 0, px, py, 6);
-    glow.addColorStop(0, "rgba(255,176,0,0.9)");
-    glow.addColorStop(1, "rgba(255,176,0,0)");
-    ctx.beginPath();
-    ctx.fillStyle = glow;
-    ctx.arc(px, py, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.fillStyle = "#FFB000";
-    ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    // локальная симуляция пока нет данных с сервера
-    const alpha = 0.3 + Math.abs(localState[2] / 60) * 0.4;
-    ctx.beginPath();
-    ctx.strokeStyle = `rgba(229,231,235,${alpha})`;
-    ctx.lineWidth   = 0.7;
-    ctx.moveTo(cx + localState[0] * 4,       cy + localState[2] * 3 - 80);
-    ctx.lineTo(cx + localState[0] * 4 + 0.5, cy + localState[2] * 3 - 80);
-    ctx.stroke();
-  }
+// Canvas renderer 
+function projectPoint(pt) {
+  const x = Number(pt.x ?? pt.raw_x ?? 0);
+  const y = Number(pt.y ?? pt.raw_y ?? 0);
+  const z = Number(pt.z ?? pt.raw_z ?? 0);
+  return {
+    u: (x - y) * 0.62,
+    v: z * 0.78 - (x + y) * 0.18,
+  };
 }
 
-// ── ASCII renderer ──────────────────────────────────────────────────────────
+function normalizeProjected(points, W, H) {
+  const padding = 18;
+  const projected = points.map(projectPoint);
+  const us = projected.map(p => p.u);
+  const vs = projected.map(p => p.v);
+  const uMin = Math.min(...us);
+  const uMax = Math.max(...us);
+  const vMin = Math.min(...vs);
+  const vMax = Math.max(...vs);
+  const uSpan = uMax - uMin;
+  const vSpan = vMax - vMin;
+  const uRange = uSpan || 1;
+  const vRange = vSpan || 1;
+
+  return projected.map(p => ({
+    x: uSpan < 1e-6 ? W / 2 : padding + ((p.u - uMin) / uRange) * (W - padding * 2),
+    y: vSpan < 1e-6 ? H / 2 : H - padding - ((p.v - vMin) / vRange) * (H - padding * 2),
+  }));
+}
+
+function drawMoodCanvas(ctx, trail, currentPoint, W, H, timeMs) {
+  ctx.fillStyle = "#050505";
+  ctx.fillRect(0, 0, W, H);
+
+  const points = (trail || []).filter(pt =>
+    Number.isFinite(Number(pt.x ?? pt.raw_x)) &&
+    Number.isFinite(Number(pt.y ?? pt.raw_y)) &&
+    Number.isFinite(Number(pt.z ?? pt.raw_z))
+  ).slice(-200);
+
+  if (points.length === 0) return;
+
+  const renderPoints = currentPoint ? [...points, currentPoint] : points;
+  const projected = normalizeProjected(renderPoints, W, H);
+  const trailProjected = projected.slice(0, points.length);
+  const len = trailProjected.length;
+
+  ctx.strokeStyle = "rgba(255,176,0,0.08)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  for (let i = 1; i < len; i++) {
+    const t = i / Math.max(1, len - 1);
+    const prev = trailProjected[i - 1];
+    const pt = trailProjected[i];
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(255,176,0,${0.08 + t * 0.58})`;
+    ctx.lineWidth = t > 0.88 ? 1.25 : 0.6;
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(pt.x, pt.y);
+    ctx.stroke();
+  }
+
+  const head = projected[projected.length - 1];
+  const pulse = 4.5 + Math.sin(timeMs / 180) * 1.5;
+  const glow = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, 12);
+  glow.addColorStop(0, "rgba(255,176,0,0.9)");
+  glow.addColorStop(0.38, "rgba(255,176,0,0.32)");
+  glow.addColorStop(1, "rgba(255,176,0,0)");
+  ctx.beginPath();
+  ctx.fillStyle = glow;
+  ctx.arc(head.x, head.y, pulse + 8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle = "#FFB000";
+  ctx.arc(head.x, head.y, 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ASCII renderer
 function buildAsciiGrid(trail) {
   const grid = Array.from({ length: ASCII_ROWS }, () =>
     Array(ASCII_COLS).fill({ ch: " ", age: -1 })
@@ -131,7 +161,7 @@ function buildAsciiGrid(trail) {
   return grid;
 }
 
-// ── Mood Bar ────────────────────────────────────────────────────────────────
+// Mood Bar
 function MoodBar({ label, value }) {
   const pct   = Math.round((value ?? 0) * 100);
   const color = value > 0.66 ? C.ok : value > 0.33 ? C.amber : C.textDim;
@@ -153,11 +183,162 @@ function MoodBar({ label, value }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
+function ChatMessage({ msg, compact = false }) {
+  const isAssistant = msg.role === "assistant";
+  return (
+    <div style={{
+      alignSelf: isAssistant ? "flex-start" : "flex-end",
+      width: compact ? "100%" : "min(78%, 760px)",
+      borderLeft: isAssistant ? `2px solid ${C.amber}` : `2px solid ${C.border}`,
+      borderRight: isAssistant ? "none" : `2px solid ${C.border}`,
+      padding: compact ? "0 0 0 9px" : "10px 14px",
+      color: isAssistant ? C.active : C.textSec,
+      fontSize: compact ? 11 : 13,
+      lineHeight: compact ? 1.65 : 1.75,
+      fontStyle: isAssistant ? "italic" : "normal",
+      background: compact ? "transparent" : isAssistant ? "rgba(255,176,0,0.025)" : "rgba(255,255,255,0.015)",
+      userSelect: "text",
+      whiteSpace: "pre-wrap",
+      overflowWrap: "anywhere",
+    }}>
+      {msg.content}
+    </div>
+  );
+}
+
+function ChatPanel({
+  chatHistory,
+  inputText,
+  setInputText,
+  sendMessage,
+  connected,
+  chatEndRef,
+}) {
+  return (
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{
+        borderBottom: `1px solid ${C.border}`,
+        padding: "18px 28px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        background: C.bg,
+      }}>
+        <div>
+          <div style={{ fontSize: 9, letterSpacing: 4, color: C.textDim, marginBottom: 7 }}>EMIYA</div>
+          <div style={{ fontSize: 12, color: C.textSec, letterSpacing: 2 }}>
+            {connected ? "dialogue channel open" : "waiting for backend"}
+          </div>
+        </div>
+        <span style={{
+          fontSize: 9,
+          letterSpacing: 2,
+          color: connected ? C.ok : C.danger,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}>
+          <span style={{
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: connected ? C.ok : C.danger,
+            display: "inline-block",
+            boxShadow: connected ? `0 0 6px ${C.ok}` : "none",
+          }} />
+          {connected ? "ONLINE" : "OFFLINE"}
+        </span>
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        padding: "28px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        minHeight: 0,
+      }}>
+        {chatHistory.map((msg, i) => (
+          <ChatMessage key={i} msg={msg} />
+        ))}
+        {!chatHistory.length && (
+          <div style={{
+            margin: "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            color: C.textDim,
+            opacity: 0.42,
+            fontSize: 10,
+            letterSpacing: 3,
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.textDim, animation: "pulse 2.5s infinite" }} />
+            наблюдает
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div style={{
+        borderTop: `1px solid ${C.border}`,
+        padding: "14px 20px 18px",
+        display: "grid",
+        gridTemplateColumns: "1fr 48px",
+        gap: 12,
+        background: C.panel,
+      }}>
+        <textarea
+          value={inputText}
+          onChange={e => setInputText(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
+          placeholder="написать emiya..."
+          rows={3}
+          style={{
+            resize: "none",
+            width: "100%",
+            background: "#050505",
+            border: `1px solid ${C.border}`,
+            color: C.textMain,
+            fontFamily: "inherit",
+            fontSize: 13,
+            lineHeight: 1.6,
+            padding: "10px 12px",
+            outline: "none",
+            letterSpacing: 0,
+            userSelect: "text",
+          }}
+        />
+        <button
+          onClick={sendMessage}
+          disabled={!connected || !inputText.trim()}
+          style={{
+            background: "none",
+            border: `1px solid ${connected && inputText.trim() ? C.amber : C.border}`,
+            color: connected && inputText.trim() ? C.amber : C.textDim,
+            fontFamily: "inherit",
+            fontSize: 16,
+            cursor: connected && inputText.trim() ? "pointer" : "default",
+            alignSelf: "stretch",
+          }}
+        >
+          →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 export default function EmiyaUI() {
   const [data, setData]               = useState(null);
   const [connected, setConnected]     = useState(false);
-  const [activeTab, setActiveTab]     = useState("monitor");
+  const [activeTab, setActiveTab]     = useState("chat");
   const [glitch, setGlitch]           = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
   const [inputText, setInputText]     = useState("");
@@ -172,12 +353,15 @@ export default function EmiyaUI() {
   const chatEndRef  = useRef(null);
   // локальная симуляция для плавной анимации — всегда работает на 60fps
   const localState  = useRef([0.1, 0, 0]);
+  const fallbackTrailRef = useRef([]);
+  const targetPointRef   = useRef(null);
+  const displayPointRef  = useRef(null);
   // параметры аттрактора — синкаются с сервером
   const lorenzParams = useRef({ sigma: 10, rho: 28, beta: 8/3 });
   const animRef     = useRef(null);
   const trailRef    = useRef([]);  // серверный trail (для ASCII режима)
 
-  // ── WebSocket ─────────────────────────────────────────────────────────────
+  // WebSocket
   useEffect(() => {
     const connect = () => {
       const ws = new WebSocket("ws://localhost:7474");
@@ -197,7 +381,23 @@ export default function EmiyaUI() {
         if (packet.trail) { trailRef.current = packet.trail; setTrail(packet.trail); }
 
         // mood — плавное обновление через CSS transition (не прыгает)
-        if (packet.mood) setMood(packet.mood);
+        if (packet.mood) {
+          setMood(packet.mood);
+          if (
+            Number.isFinite(Number(packet.mood.x)) &&
+            Number.isFinite(Number(packet.mood.y)) &&
+            Number.isFinite(Number(packet.mood.z))
+          ) {
+            targetPointRef.current = {
+              x: Number(packet.mood.x),
+              y: Number(packet.mood.y),
+              z: Number(packet.mood.z),
+            };
+            if (!displayPointRef.current) {
+              displayPointRef.current = targetPointRef.current;
+            }
+          }
+        }
 
         // синкаем параметры аттрактора в ref — canvas подхватит на следующем кадре
         if (packet.mood?.sigma) {
@@ -224,9 +424,7 @@ export default function EmiyaUI() {
     return () => wsRef.current?.close();
   }, []);
 
-  // ── Canvas animation loop — 60fps локальная симуляция ────────────────────
-  // серверный trail не используется для canvas — он только для ASCII
-  // параметры (sigma/rho/beta) синкаются с сервером через lorenzParams ref
+  // Canvas animation loop — серверный trail + offline fallback
   useEffect(() => {
     if (asciiMode) { cancelAnimationFrame(animRef.current); return; }
     const canvas = canvasRef.current;
@@ -234,59 +432,36 @@ export default function EmiyaUI() {
     const ctx = canvas.getContext("2d");
     const W   = canvas.width;
     const H   = canvas.height;
-    const cx  = W / 2;
-    const cy  = H / 2;
-
-    // ring buffer для локального trail (последние 300 точек)
-    const localTrail = [];
-    const MAX_TRAIL  = 300;
+    const MAX_FALLBACK_TRAIL = 200;
 
     const draw = () => {
-      const { sigma, rho, beta } = lorenzParams.current;
+      const serverTrail = trailRef.current;
 
-      // шаг симуляции
-      localState.current = lorenzStepRK4(...localState.current, sigma, rho, beta);
-      const [x, , z] = localState.current;
-
-      // добавляем точку в локальный trail
-      localTrail.push({ x, z });
-      if (localTrail.length > MAX_TRAIL) localTrail.shift();
-
-      // fade background
-      ctx.fillStyle = "rgba(5,5,5,0.04)";
-      ctx.fillRect(0, 0, W, H);
-
-      // рисуем trail
-      const len = localTrail.length;
-      for (let i = 1; i < len; i++) {
-        const t     = i / len;
-        const alpha = t * 0.7;
-        const pt    = localTrail[i];
-        const prev  = localTrail[i - 1];
-        ctx.beginPath();
-        ctx.strokeStyle = `rgba(255,176,0,${alpha})`;
-        ctx.lineWidth   = t > 0.85 ? 1.2 : 0.5;
-        ctx.moveTo(cx + prev.x * 4, cy + prev.z * 3 - 80);
-        ctx.lineTo(cx + pt.x   * 4, cy + pt.z   * 3 - 80);
-        ctx.stroke();
-      }
-
-      // текущая точка — glow
-      if (localTrail.length > 0) {
-        const last = localTrail[localTrail.length - 1];
-        const px   = cx + last.x * 4;
-        const py   = cy + last.z * 3 - 80;
-        const glow = ctx.createRadialGradient(px, py, 0, px, py, 5);
-        glow.addColorStop(0, "rgba(255,176,0,0.9)");
-        glow.addColorStop(1, "rgba(255,176,0,0)");
-        ctx.beginPath();
-        ctx.fillStyle = glow;
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.fillStyle = "#FFB000";
-        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-        ctx.fill();
+      if (serverTrail.length > 0 && targetPointRef.current) {
+        const current = displayPointRef.current || targetPointRef.current;
+        const target = targetPointRef.current;
+        displayPointRef.current = {
+          x: current.x + (target.x - current.x) * 0.09,
+          y: current.y + (target.y - current.y) * 0.09,
+          z: current.z + (target.z - current.z) * 0.09,
+        };
+        drawMoodCanvas(ctx, serverTrail, displayPointRef.current, W, H, performance.now());
+      } else {
+        const { sigma, rho, beta } = lorenzParams.current;
+        localState.current = lorenzStepRK4(...localState.current, sigma, rho, beta);
+        const [x, y, z] = localState.current;
+        fallbackTrailRef.current.push({ x, y, z });
+        if (fallbackTrailRef.current.length > MAX_FALLBACK_TRAIL) {
+          fallbackTrailRef.current.shift();
+        }
+        drawMoodCanvas(
+          ctx,
+          fallbackTrailRef.current,
+          fallbackTrailRef.current[fallbackTrailRef.current.length - 1],
+          W,
+          H,
+          performance.now()
+        );
       }
 
       animRef.current = requestAnimationFrame(draw);
@@ -295,7 +470,7 @@ export default function EmiyaUI() {
     return () => cancelAnimationFrame(animRef.current);
   }, [asciiMode]);
 
-  // ── Локальные часы — тикают каждую секунду ───────────────────────────────
+  // Локальные часы — тикают каждую секунду
   useEffect(() => {
     const tick = () => {
       const now = new Date();
@@ -308,7 +483,7 @@ export default function EmiyaUI() {
     return () => clearInterval(t);
   }, []);
 
-  // ── Glitch ────────────────────────────────────────────────────────────────
+  // Glitch
   useEffect(() => {
     const t = setInterval(() => {
       if (Math.random() < 0.08) {
@@ -319,12 +494,12 @@ export default function EmiyaUI() {
     return () => clearInterval(t);
   }, []);
 
-  // ── Autoscroll chat ───────────────────────────────────────────────────────
+  // Autoscroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
+  }, [chatHistory, activeTab]);
 
-  // ── Mood Tuner send ───────────────────────────────────────────────────────
+  // Mood Tuner send
   const sendTuner = useCallback((params) => {
     if (!wsRef.current || wsRef.current.readyState !== 1) return;
     wsRef.current.send(JSON.stringify({ type: "mood_params", ...params }));
@@ -336,7 +511,7 @@ export default function EmiyaUI() {
   }, []);
 
   const sendMessage = () => {
-    if (!inputText.trim() || !wsRef.current) return;
+    if (!inputText.trim() || !wsRef.current || wsRef.current.readyState !== 1) return;
     const text = inputText.trim();
     setInputText("");
     setChatHistory(h => [...h, { role: "user", content: text }]);
@@ -347,6 +522,7 @@ export default function EmiyaUI() {
   const states = data?.states || [];
   const cpu    = data?.cpu    || 0;
   const ram    = data?.ram    || 0;
+  const latestAssistant = [...chatHistory].reverse().find(msg => msg.role === "assistant");
 
   const stateColor = (s) => {
     if (s === "grinding" || s === "late_night") return C.danger;
@@ -354,7 +530,7 @@ export default function EmiyaUI() {
     return C.textSec;
   };
 
-  // ── ASCII grid ────────────────────────────────────────────────────────────
+  // ASCII grid
   const asciiGrid = asciiMode ? buildAsciiGrid(trail) : null;
 
   const PRESETS = [
@@ -364,7 +540,6 @@ export default function EmiyaUI() {
     { name: "storm",         label: "[storm]" },
   ];
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div style={{
       background: C.bg,
@@ -428,7 +603,7 @@ export default function EmiyaUI() {
 
           {/* TABS */}
           <div style={{ borderBottom: `1px solid ${C.border}`, display: "flex", background: C.panel }}>
-            {["monitor", "patterns", "log"].map(tab => (
+            {["monitor", "chat", "patterns", "log"].map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} style={{
                 background: "none", border: "none",
                 borderRight: `1px solid ${C.border}`,
@@ -501,6 +676,17 @@ export default function EmiyaUI() {
             </div>
           )}
 
+          {activeTab === "chat" && (
+            <ChatPanel
+              chatHistory={chatHistory}
+              inputText={inputText}
+              setInputText={setInputText}
+              sendMessage={sendMessage}
+              connected={connected}
+              chatEndRef={chatEndRef}
+            />
+          )}
+
           {activeTab === "patterns" && (
             <div style={{ padding: "20px 24px" }}>
               <div style={{ fontSize: 9, letterSpacing: 4, color: C.textDim, marginBottom: 16 }}>BEHAVIORAL PATTERNS</div>
@@ -524,20 +710,26 @@ export default function EmiyaUI() {
 
             {/* canvas mode */}
             {!asciiMode && (
-              <canvas ref={canvasRef} width={260} height={190} style={{ display: "block" }} />
+              <canvas
+                ref={canvasRef}
+                width={MOOD_CANVAS_SIZE}
+                height={MOOD_CANVAS_SIZE}
+                style={{ display: "block", margin: "0 auto" }}
+              />
             )}
 
             {/* ASCII mode */}
             {asciiMode && (
               <div style={{
-                width: 260, height: 190,
-                padding: "8px 6px",
+                width: MOOD_CANVAS_SIZE, height: MOOD_CANVAS_SIZE,
+                margin: "0 auto",
+                padding: "24px 6px 8px",
                 fontFamily: "'Courier New', monospace",
-                fontSize: 7.5,
-                lineHeight: 1.45,
+                fontSize: 7,
+                lineHeight: 1.55,
                 color: C.amber,
                 overflow: "hidden",
-                letterSpacing: "0.05em",
+                letterSpacing: 0,
               }}>
                 {asciiGrid && asciiGrid.map((row, ri) => (
                   <div key={ri} style={{ whiteSpace: "pre" }}>
@@ -580,7 +772,7 @@ export default function EmiyaUI() {
             <MoodBar label="OPENNESS" value={mood.openness} />
           </div>
 
-          {/* ── Mood Tuner ── */}
+          {/* Mood Tuner */}
           <div style={{ padding: "8px 14px", borderBottom: `1px solid ${C.border}` }}>
             <div style={{ fontSize: 8, letterSpacing: 4, color: C.textDim, marginBottom: 8 }}>MOOD TUNER</div>
 
@@ -646,45 +838,35 @@ export default function EmiyaUI() {
             ))}
           </div>
 
-          {/* ── Chat ── */}
-          <div style={{ flex: 1, padding: "10px 14px", display: "flex", flexDirection: "column", minHeight: 180 }}>
-            <div style={{ fontSize: 8, letterSpacing: 4, color: C.textDim, marginBottom: 10 }}>EMIYA</div>
-            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 10 }}>
-              {chatHistory.map((msg, i) => (
-                <div key={i} style={{
-                  fontSize: 11, color: msg.role === "assistant" ? C.active : C.textSec,
-                  lineHeight: 1.7,
-                  borderLeft: msg.role === "assistant" ? `2px solid ${C.textDim}` : `2px solid ${C.borderSoft}`,
-                  paddingLeft: 10,
-                  fontStyle: msg.role === "assistant" ? "italic" : "normal",
-                }}>{msg.content}</div>
-              ))}
-              <div ref={chatEndRef} />
-              {!chatHistory.length && (
+          {/* Chat status */}
+          <div style={{ flex: 1, padding: "10px 14px", display: "flex", flexDirection: "column", minHeight: 160 }}>
+            <div style={{ fontSize: 8, letterSpacing: 4, color: C.textDim, marginBottom: 12 }}>EMIYA</div>
+            <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 12 }}>
+              {latestAssistant ? (
+                <ChatMessage msg={latestAssistant} compact />
+              ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 0.35, marginTop: "auto" }}>
                   <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.textDim, animation: "pulse 2.5s infinite" }} />
                   <span style={{ fontSize: 9, letterSpacing: 3, color: C.textDim }}>наблюдает</span>
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", gap: 8, borderTop: `1px solid ${C.borderSoft}`, paddingTop: 8 }}>
-              <input value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") sendMessage(); }}
-                placeholder="написать Emiya..."
-                style={{
-                  flex: 1, background: "none", border: "none",
-                  borderBottom: `1px solid ${C.border}`,
-                  color: C.textMain, fontFamily: "inherit",
-                  fontSize: 10, padding: "4px 0", outline: "none", letterSpacing: 1,
-                }}
-              />
-              <button onClick={sendMessage} style={{
-                background: "none", border: "none", color: C.textDim,
-                fontFamily: "inherit", fontSize: 9, letterSpacing: 2,
-                cursor: "pointer", padding: "4px 8px",
-              }}>→</button>
-            </div>
+            <button
+              onClick={() => setActiveTab("chat")}
+              style={{
+                marginTop: 12,
+                background: "none",
+                border: `1px solid ${activeTab === "chat" ? `${C.amber}70` : C.border}`,
+                color: activeTab === "chat" ? C.amber : C.textDim,
+                fontFamily: "inherit",
+                fontSize: 8,
+                letterSpacing: 2,
+                padding: "6px 8px",
+                cursor: "pointer",
+              }}
+            >
+              CHAT
+            </button>
           </div>
 
           {/* Bottom status */}
