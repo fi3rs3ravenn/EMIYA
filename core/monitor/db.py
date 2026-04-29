@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'emiya.db')
@@ -59,6 +60,31 @@ def init_db():
         )
     ''')
 
+    # лог диалогов и сырых thinking-блоков моделей
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chat_log (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp      TEXT NOT NULL,
+            session_id     INTEGER,
+            turn_id        TEXT,
+            role           TEXT NOT NULL,
+            source         TEXT NOT NULL,
+            content        TEXT NOT NULL,
+            thought        TEXT,
+            raw_response   TEXT,
+            model          TEXT,
+            trigger        TEXT,
+            mood_energy    REAL,
+            mood_focus     REAL,
+            mood_openness  REAL,
+            metadata       TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(id)
+        )
+    ''')
+
+    c.execute("CREATE INDEX IF NOT EXISTS idx_chat_log_session ON chat_log(session_id, id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_chat_log_turn ON chat_log(turn_id)")
+
     conn.commit()
     conn.close()
     print("[DB] инициализирована")
@@ -116,10 +142,66 @@ def log_trigger(trigger, message, session_id):
     conn.commit()
     conn.close()
 
+def log_chat_message(
+    session_id,
+    role,
+    content,
+    source,
+    turn_id=None,
+    thought=None,
+    raw_response=None,
+    model=None,
+    trigger=None,
+    mood=None,
+    metadata=None,
+):
+    mood = mood or {}
+    metadata_json = json.dumps(metadata, ensure_ascii=False) if metadata else None
+
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute(
+        '''
+        INSERT INTO chat_log (
+            timestamp, session_id, turn_id, role, source, content,
+            thought, raw_response, model, trigger,
+            mood_energy, mood_focus, mood_openness, metadata
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ''',
+        (
+            datetime.now().isoformat(),
+            session_id,
+            turn_id,
+            role,
+            source,
+            content,
+            thought,
+            raw_response,
+            model,
+            trigger,
+            mood.get("energy"),
+            mood.get("focus"),
+            mood.get("openness"),
+            metadata_json,
+        )
+    )
+    conn.commit()
+    conn.close()
+
 if __name__ == "__main__":
     init_db()
     sid = start_session()
     log_window("VS Code", "code", sid)
     log_state("deep_work", sid)
     log_trigger("grinding", "три часа. что держит?", sid)
+    log_chat_message(sid, "user", "ты здесь?", "user", turn_id="demo")
+    log_chat_message(
+        sid,
+        "assistant",
+        "здесь.",
+        "l1",
+        turn_id="demo",
+        thought="короткий ответ лучше.",
+        model="qwen3:14b",
+    )
     print("[DB] тест прошёл успешно")
