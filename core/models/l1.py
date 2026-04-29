@@ -1,5 +1,6 @@
 import requests
 from pathlib import Path
+from models.response_utils import split_thinking, strip_speaker_prefix
 
 MODEL        = "qwen3:14b"
 OLLAMA_URL   = "http://localhost:11434/api/chat"
@@ -41,7 +42,14 @@ def _build_system(context: dict | None) -> str:
     return system
 
 
-def chat(messages: list, context: dict = None) -> str | None:
+def _clean(text: str) -> str:
+    text = strip_speaker_prefix(text)
+    text = text.lower()
+    text = text.replace("!", ".")
+    return text
+
+
+def chat(messages: list, context: dict = None, return_metadata: bool = False) -> str | dict | None:
     system = _build_system(context)
 
     prompt_messages = []
@@ -70,17 +78,17 @@ def chat(messages: list, context: dict = None) -> str | None:
             }, timeout=90)   # qwen3:14b может думать дольше
 
         if response.status_code == 200:
-            text = response.json().get("message", {}).get("content", "").strip()
-            # убираем thinking блок если проскочил
-            if "<think>" in text and "</think>" in text:
-                end  = text.find("</think>")
-                text = text[end + 8:].strip()
-            text = text.strip('"').strip("'")
-            text = text.lower()
-            text = text.replace("!", ".")
-            if text.startswith("emiya:"):
-                text = text[6:].strip()
-            return text
+            raw_text = response.json().get("message", {}).get("content", "").strip()
+            visible_text, thought = split_thinking(raw_text)
+            cleaned = _clean(visible_text)
+            if return_metadata:
+                return {
+                    "content": cleaned,
+                    "thought": thought,
+                    "raw_response": raw_text,
+                    "model": MODEL,
+                }
+            return cleaned
         return None
 
     except Exception as e:

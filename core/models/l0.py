@@ -1,5 +1,6 @@
 import requests
 from pathlib import Path
+from models.response_utils import split_thinking, strip_speaker_prefix
 
 MODEL      = "qwen3:4b"
 OLLAMA_URL = "http://localhost:11434/api/chat"
@@ -50,13 +51,7 @@ def build_user_prompt(trigger: str, context: dict) -> str:
 
 def _clean(text: str) -> str:
     """Постобработка ответа модели."""
-    text = text.strip().strip('"').strip("'")
-    # убираем thinking блок если всё же проскочил
-    if "<think>" in text and "</think>" in text:
-        end = text.find("</think>")
-        text = text[end + 8:].strip()
-    if text.lower().startswith("emiya:"):
-        text = text[6:].strip()
+    text = strip_speaker_prefix(text)
     text = text.lower().replace("!", ".")
     sentences = [s.strip() for s in text.split(".") if s.strip()]
     result = ". ".join(sentences[:2])
@@ -65,7 +60,7 @@ def _clean(text: str) -> str:
     return result
 
 
-def generate(trigger: str, context: dict) -> str | None:
+def generate(trigger: str, context: dict, return_metadata: bool = False) -> str | dict | None:
     mood   = context.get("mood")
     system = _build_system(mood)
 
@@ -86,8 +81,17 @@ def generate(trigger: str, context: dict) -> str | None:
         }, timeout=20)
 
         if response.status_code == 200:
-            text = response.json().get("message", {}).get("content", "").strip()
-            return _clean(text)
+            raw_text = response.json().get("message", {}).get("content", "").strip()
+            visible_text, thought = split_thinking(raw_text)
+            cleaned = _clean(visible_text)
+            if return_metadata:
+                return {
+                    "content": cleaned,
+                    "thought": thought,
+                    "raw_response": raw_text,
+                    "model": MODEL,
+                }
+            return cleaned
         return None
 
     except Exception as e:
