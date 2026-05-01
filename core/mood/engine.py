@@ -8,6 +8,7 @@ from mood.lorenz import LorenzAttractor, MoodVector, PRESETS
 
 TRAIL_SIZE  = 500   # точки в ring buffer (для canvas)
 TICK_RATE   = 1.0   # секунд между шагами (1 Hz)
+LOG_EVERY_TICKS = 30
 
 # сколько шагов аттрактора за один тик
 # больше → mood быстрее дрейфует
@@ -42,6 +43,7 @@ class MoodEngine:
         sigma: float = 10.0,
         rho:   float = 28.0,
         beta:  float = 8.0 / 3.0,
+        log_interval_ticks: int = LOG_EVERY_TICKS,
     ):
         self._attractor = LorenzAttractor(sigma=sigma, rho=rho, beta=beta)
         self._current: MoodVector = self._attractor.current()
@@ -51,6 +53,8 @@ class MoodEngine:
 
         self._running = False
         self._task: asyncio.Task | None = None
+        self._tick_count = 0
+        self._log_interval_ticks = max(0, int(log_interval_ticks))
 
     def get_current(self) -> MoodVector:
         return self._current
@@ -108,6 +112,7 @@ class MoodEngine:
 
         if mood:
             self._current = mood
+            self._tick_count += 1
             self._trail.append({
                 "x": round(mood.raw_x, 4),
                 "y": round(mood.raw_y, 4),
@@ -117,6 +122,21 @@ class MoodEngine:
                 "openness": round(mood.openness, 4),
                 "timestamp": self._timestamp(),
             })
+            self._log_mood(mood)
+
+    def _log_mood(self, mood: MoodVector) -> None:
+        if self._log_interval_ticks <= 0:
+            return
+        if self._tick_count != 1 and self._tick_count % self._log_interval_ticks != 0:
+            return
+
+        print(
+            "[Mood] "
+            f"t={self._tick_count}s "
+            f"e={mood.energy:.3f} f={mood.focus:.3f} o={mood.openness:.3f} "
+            f"raw=({mood.raw_x:.2f},{mood.raw_y:.2f},{mood.raw_z:.2f}) "
+            f"params=(σ={self._attractor.sigma:g},ρ={self._attractor.rho:g},β={self._attractor.beta:.3g})"
+        )
 
     @staticmethod
     def _timestamp() -> str:
