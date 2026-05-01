@@ -7,6 +7,12 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 
 _prompt_file  = Path(__file__).parent.parent / "prompts" / "l0.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
+BASE_OPTIONS = {
+    "temperature": 0.85,
+    "top_p":       0.9,
+    "num_predict": 100,   # чуть больше запаса для qwen3
+    "thinking": False,
+}
 
 
 def _build_system(mood: dict | None) -> str:
@@ -14,19 +20,24 @@ def _build_system(mood: dict | None) -> str:
 
     if mood:
         try:
-            from mood.modifiers import mood_to_prompt_fragment
-            from mood.lorenz import MoodVector
-            mood_vec = MoodVector(
-                energy   = mood.get("energy", 0.5),
-                focus    = mood.get("focus", 0.5),
-                openness = mood.get("openness", 0.5),
-                raw_x=0, raw_y=0, raw_z=0,
-            )
+            from mood.modifiers import mood_from_mapping, mood_to_prompt_fragment
+            mood_vec = mood_from_mapping(mood)
             system = mood_to_prompt_fragment(mood_vec) + "\n\n" + system
         except Exception as e:
             print(f"[L0] mood injection ошибка: {e}")
 
     return system
+
+
+def _build_options(mood: dict | None) -> dict:
+    options = dict(BASE_OPTIONS)
+
+    try:
+        from mood.modifiers import mood_from_mapping, mood_to_model_options
+        return mood_to_model_options(mood_from_mapping(mood), options)
+    except Exception as e:
+        print(f"[L0] mood options ошибка: {e}")
+        return options
 
 
 def build_user_prompt(trigger: str, context: dict) -> str:
@@ -63,6 +74,7 @@ def _clean(text: str) -> str:
 def generate(trigger: str, context: dict, return_metadata: bool = False) -> str | dict | None:
     mood   = context.get("mood")
     system = _build_system(mood)
+    options = _build_options(mood)
 
     try:
         response = requests.post(OLLAMA_URL, json={
@@ -72,12 +84,7 @@ def generate(trigger: str, context: dict, return_metadata: bool = False) -> str 
                 {"role": "user",    "content": build_user_prompt(trigger, context)},
             ],
             "stream": False,
-            "options": {
-                "temperature": 0.85,
-                "top_p":       0.9,
-                "num_predict": 100,   # чуть больше запаса для qwen3
-                "thinking": False,
-            },
+            "options": options,
         }, timeout=20)
 
         if response.status_code == 200:
@@ -90,6 +97,7 @@ def generate(trigger: str, context: dict, return_metadata: bool = False) -> str 
                     "thought": thought,
                     "raw_response": raw_text,
                     "model": MODEL,
+                    "mood_seed": options.get("seed"),
                 }
             return cleaned
         return None
