@@ -2,10 +2,16 @@ import requests
 from pathlib import Path
 from models.response_utils import split_thinking, strip_speaker_prefix
 
-MODEL        = "qwen3:14b"
+MODEL        = "qwen3:8b"
 OLLAMA_URL   = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
+BASE_OPTIONS = {
+    "temperature": 0.8,
+    "top_p":       0.9,
+    "num_predict": 2000,
+    "thinking": False,
+}
 
 
 def _build_system(context: dict | None) -> str:
@@ -13,16 +19,10 @@ def _build_system(context: dict | None) -> str:
 
     if context and "mood" in context:
         try:
-            from mood.modifiers import mood_to_prompt_fragment
-            from mood.lorenz import MoodVector
+            from mood.modifiers import mood_from_mapping, mood_to_prompt_fragment
 
             m = context["mood"]
-            mood_vec = MoodVector(
-                energy   = m.get("energy", 0.5),
-                focus    = m.get("focus", 0.5),
-                openness = m.get("openness", 0.5),
-                raw_x=0, raw_y=0, raw_z=0,
-            )
+            mood_vec = mood_from_mapping(m)
             mood_block = mood_to_prompt_fragment(mood_vec)
             system = mood_block + "\n\n" + system
         except Exception as e:
@@ -42,6 +42,18 @@ def _build_system(context: dict | None) -> str:
     return system
 
 
+def _build_options(context: dict | None) -> dict:
+    options = dict(BASE_OPTIONS)
+    mood = context.get("mood") if context else None
+
+    try:
+        from mood.modifiers import mood_from_mapping, mood_to_model_options
+        return mood_to_model_options(mood_from_mapping(mood), options)
+    except Exception as e:
+        print(f"[L1] mood options ошибка: {e}")
+        return options
+
+
 def _clean(text: str) -> str:
     text = strip_speaker_prefix(text)
     text = text.lower()
@@ -51,6 +63,7 @@ def _clean(text: str) -> str:
 
 def chat(messages: list, context: dict = None, return_metadata: bool = False) -> str | dict | None:
     system = _build_system(context)
+    options = _build_options(context)
 
     prompt_messages = []
     for msg in messages[-6:]:
@@ -69,13 +82,8 @@ def chat(messages: list, context: dict = None, return_metadata: bool = False) ->
                     *prompt_messages
                 ],
                 "stream": False,
-                "options": {
-                    "temperature": 0.8,
-                    "top_p":       0.9,
-                    "num_predict": 2000,
-                    "thinking": False
-                }
-            }, timeout=90)   # qwen3:14b может думать дольше
+                "options": options,
+            }, timeout=90)   # крупная L1 может думать дольше
 
         if response.status_code == 200:
             raw_text = response.json().get("message", {}).get("content", "").strip()
@@ -87,6 +95,7 @@ def chat(messages: list, context: dict = None, return_metadata: bool = False) ->
                     "thought": thought,
                     "raw_response": raw_text,
                     "model": MODEL,
+                    "mood_seed": options.get("seed"),
                 }
             return cleaned
         return None
