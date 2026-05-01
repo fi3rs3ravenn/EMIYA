@@ -2,6 +2,54 @@ from mood.lorenz import MoodVector
 
 LOW_THRESHOLD  = 0.40
 HIGH_THRESHOLD = 0.60
+DEFAULT_MOOD_SEED = 0x45A11CE
+
+
+def _coerce_float(value, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def mood_from_mapping(mood) -> MoodVector:
+    if isinstance(mood, MoodVector):
+        return mood
+
+    data = mood or {}
+    return MoodVector(
+        energy=_clamp01(_coerce_float(data.get("energy"), 0.5)),
+        focus=_clamp01(_coerce_float(data.get("focus"), 0.5)),
+        openness=_clamp01(_coerce_float(data.get("openness"), 0.5)),
+        raw_x=_coerce_float(data.get("raw_x", data.get("x")), 0.0),
+        raw_y=_coerce_float(data.get("raw_y", data.get("y")), 0.0),
+        raw_z=_coerce_float(data.get("raw_z", data.get("z")), 0.0),
+    )
+
+
+def mood_seed(mood: MoodVector) -> int:
+    values = (
+        int(round(_clamp01(mood.energy) * 1000)),
+        int(round(_clamp01(mood.focus) * 1000)),
+        int(round(_clamp01(mood.openness) * 1000)),
+    )
+
+    seed = DEFAULT_MOOD_SEED
+    for value in values:
+        seed ^= value & 0xFFFF
+        seed = (seed * 16777619) & 0x7FFFFFFF
+
+    return seed or DEFAULT_MOOD_SEED
+
+
+def mood_to_model_options(mood: MoodVector, base_options: dict | None = None) -> dict:
+    options = dict(base_options or {})
+    options["seed"] = mood_seed(mood)
+    return options
 
 ENERGY = {
     "low":  ("low",
