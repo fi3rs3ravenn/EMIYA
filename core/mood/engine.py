@@ -96,7 +96,7 @@ class MoodEngine:
         return True
     async def run(self) -> None:
         self._running = True
-        print(f"[MoodEngine] запущен · {STEPS_PER_TICK} шагов/тик · {TICK_RATE}s интервал")
+        print(f"[MoodEngine] запущен - {STEPS_PER_TICK} шагов/тик - {TICK_RATE}s интервал")
 
         while self._running:
             self._tick()
@@ -135,7 +135,7 @@ class MoodEngine:
             f"t={self._tick_count}s "
             f"e={mood.energy:.3f} f={mood.focus:.3f} o={mood.openness:.3f} "
             f"raw=({mood.raw_x:.2f},{mood.raw_y:.2f},{mood.raw_z:.2f}) "
-            f"params=(σ={self._attractor.sigma:g},ρ={self._attractor.rho:g},β={self._attractor.beta:.3g})"
+            f"params=(sigma={self._attractor.sigma:g},rho={self._attractor.rho:g},beta={self._attractor.beta:.3g})"
         )
 
     @staticmethod

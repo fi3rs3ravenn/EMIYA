@@ -115,7 +115,7 @@ class TriggerEngine:
         if self.on_trigger:
             self.on_trigger(trigger, message)
 
-        print(f"[Trigger] {trigger} → {message}")
+        print(f"[Trigger] {trigger} -> {message}")
         return trigger, message
 
     def reset_day(self):
