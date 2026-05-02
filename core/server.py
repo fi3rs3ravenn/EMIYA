@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 import threading
 import uuid
 import websockets
@@ -31,6 +32,13 @@ STATE_NUDGES = {
 }
 
 
+def configure_output_encoding():
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 class EmiyaServer:
     def __init__(self):
         init_db()
@@ -52,6 +60,7 @@ class EmiyaServer:
         self._current_states = {"normal"}
         self._current_apps   = []
         self._current_stats  = self.session_tracker.get_stats()
+        self._chat_lock      = None
 
     def get_l1(self):
         if self._l1 is None:
@@ -246,23 +255,26 @@ class EmiyaServer:
                 if data.get("type") == "user_message":
                     text     = data.get("text", "")
                     print(f"[USER] {text}")
-                    response = self.handle_user_message(text)
+                    if self._chat_lock is None:
+                        self._chat_lock = asyncio.Lock()
+                    async with self._chat_lock:
+                        response = await asyncio.to_thread(self.handle_user_message, text)
                     await websocket.send(json.dumps({
                         "type":    "emiya_reply",
                         "message": response,
-                    }))
+                    }, ensure_ascii=False))
 
                 elif data.get("type") == "mood_params":
                     sigma = data.get("sigma")
                     rho   = data.get("rho")
                     beta  = data.get("beta")
                     self.mood_engine.set_params(sigma=sigma, rho=rho, beta=beta)
-                    print(f"[Mood] параметры обновлены: σ={sigma} ρ={rho} β={beta}")
+                    print(f"[Mood] параметры обновлены: sigma={sigma} rho={rho} beta={beta}")
 
                 elif data.get("type") == "mood_preset":
                     name = data.get("name", "standard")
                     ok   = self.mood_engine.set_preset(name)
-                    print(f"[Mood] пресет '{name}': {'✓' if ok else 'не найден'}")
+                    print(f"[Mood] пресет '{name}': {'ok' if ok else 'не найден'}")
 
         except Exception:
             pass
@@ -320,11 +332,12 @@ class EmiyaServer:
         asyncio.create_task(self.mood_engine.run())
         print(f"[Mood] движок запущен")
 
-        print(f"[EMIYA] сервер → ws://{HOST}:{PORT}")
+        print(f"[EMIYA] сервер -> ws://{HOST}:{PORT}")
         async with websockets.serve(self.handler, HOST, PORT):
             await self.loop()
 
 
 if __name__ == "__main__":
+    configure_output_encoding()
     server = EmiyaServer()
     asyncio.run(server.main())
