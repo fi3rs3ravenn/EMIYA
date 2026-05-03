@@ -1,0 +1,52 @@
+/* ─────────────────────────────────────────────────────────────────
+   CRT EFFECTS — scanlines + rare flicker
+   ───────────────────────────────────────────────────────────────── */
+
+.crt-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: overlay;
+}
+
+/* scanlines */
+.crt-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+  pointer-events: none;
+}
+
+/* subtle vignette */
+.crt-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.5) 100%
+  );
+  pointer-events: none;
+}
+
+/* flicker — rare, 0.4% of time, animation cycle ~25s */
+@keyframes crt-flicker {
+  0%,   99.6% { opacity: 1; }
+  99.7%       { opacity: 0.85; }
+  99.8%       { opacity: 1; }
+  99.9%       { opacity: 0.92; }
+  100%        { opacity: 1; }
+}
+
+.crt-flicker {
+  animation: crt-flicker 25s infinite;
+}
