@@ -202,6 +202,18 @@ class EmiyaServer:
         states     = self._current_states
         apps       = self._current_apps
         mood_state = self.mood_engine.get_state()
+        sys_state  = {
+            "cpu_pct":      self.last_sys.get("cpu_percent", 0),
+            "ram_pct":      self.last_sys.get("ram_percent", 0),
+            "ram_used_gb":  self.last_sys.get("ram_used_gb"),
+            "ram_total_gb": self.last_sys.get("ram_total_gb"),
+            "top_processes": self.last_sys.get("top_processes", []),
+        }
+        params = {
+            "sigma": mood_state.sigma,
+            "rho":   mood_state.rho,
+            "beta":  round(mood_state.beta, 4),
+        }
 
         packet = {
             "type":        "state_update",
@@ -209,11 +221,15 @@ class EmiyaServer:
             "timestamp":   datetime.now().isoformat(timespec="milliseconds"),
             "time_of_day": stats["time_of_day"],
             "active_min":  stats["active_minutes"],
+            "active_minutes": stats["active_minutes"],
             "is_afk":      stats["is_afk"],
             "states":      list(states),
             "apps":        apps[:5],
             "cpu":         self.last_sys.get("cpu_percent", 0),
             "ram":         self.last_sys.get("ram_percent", 0),
+            "sys":         sys_state,
+            "params":      params,
+            "models":      {"L-meta": "active", "L0": "active", "L1": "standby", "L2": "offline"},
             "emiya":       self.pending_message,
 
             "mood": {
@@ -226,9 +242,9 @@ class EmiyaServer:
                 "raw_x":    round(mood_state.raw_x, 2),
                 "raw_y":    round(mood_state.raw_y, 2),
                 "raw_z":    round(mood_state.raw_z, 2),
-                "sigma":    mood_state.sigma,
-                "rho":      mood_state.rho,
-                "beta":     round(mood_state.beta, 4),
+                "sigma":    params["sigma"],
+                "rho":      params["rho"],
+                "beta":     params["beta"],
                 "timestamp": mood_state.timestamp,
             },
             "trail": mood_state.trail[-200:],  # последние 200 точек для canvas
