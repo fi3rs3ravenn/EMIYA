@@ -31,7 +31,6 @@ __pycache__/
 
 # Runtime data
 core/emiya.db
-core/memory/
 
 # System prompts (private — только .example коммитятся)
 core/prompts/*.txt
