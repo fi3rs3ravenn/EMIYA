@@ -93,6 +93,7 @@ class TriggerEngine:
             "apps":       session_stats.get("apps", []),
             "hour":       hour,
             "mood":       mood or {"energy": 0.5, "focus": 0.5, "openness": 0.5},
+            "traits":     session_stats.get("traits"),
         }
 
         turn_id = uuid.uuid4().hex

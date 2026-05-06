@@ -2,33 +2,42 @@ import asyncio
 import json
 import sys
 import threading
+import time
 import uuid
-import websockets
 from datetime import datetime
-from monitor.db import init_db, start_session, log_state, log_chat_message
-from monitor.window_tracker import WindowTracker, get_app_time, get_switch_count
+
+import websockets
+
+from memory.retriever import MemoryRetriever
+from memory.store import MemoryStore
+from memory.writer import MemoryWriter
+from monitor.db import init_db, log_chat_message, log_state, start_session
 from monitor.session_tracker import SessionTracker
 from monitor.system_tracker import SystemTracker
 from monitor.trigger_engine import TriggerEngine
+from monitor.window_tracker import WindowTracker, get_app_time, get_switch_count
 from mood.engine import MoodEngine
+from personality.traits import TRAIT_KEYS, apply_preset, load_traits, save_traits
+from telemetry.pipeline_log import pipeline_logger
+
 
 HOST = "localhost"
 PORT = 7474
 BROADCAST_INTERVAL = 0.1
-MONITOR_INTERVAL   = 5.0
+MONITOR_INTERVAL = 5.0
 
-GRINDING_MINUTES   = 120
+GRINDING_MINUTES = 120
 SCATTERED_SWITCHES = 5
-LATE_NIGHT_START   = 23
-LATE_NIGHT_END     = 5
+LATE_NIGHT_START = 23
+LATE_NIGHT_END = 5
 STATE_NUDGES = {
-    "grinding":   ("x", +1.5),   # долго работает → энергия вверх
-    "scattered":  ("y", -2.0),   # хаос → фокус вниз
-    "deep_work":  ("y", +1.5),   # глубокая работа → фокус вверх
-    "idle_loop":  ("y", -1.0),   # петля → лёгкое рассеивание
-    "late_night": ("x", -1.0),   # ночь → энергия вниз
-    "afk":        ("z", +1.5),   # ушёл → openness вверх (становится задумчивей)
-    "gaming":     ("x", +1.0),   # игры → чуть активней
+    "grinding": ("x", +1.5),
+    "scattered": ("y", -2.0),
+    "deep_work": ("y", +1.5),
+    "idle_loop": ("y", -1.0),
+    "late_night": ("x", -1.0),
+    "afk": ("z", +1.5),
+    "gaming": ("x", +1.0),
 }
 
 
@@ -42,30 +51,36 @@ def configure_output_encoding():
 class EmiyaServer:
     def __init__(self):
         init_db()
-        self.session_id      = start_session()
+        self.session_id = start_session()
         self.session_tracker = SessionTracker(self.session_id)
-        self.window_tracker  = WindowTracker(self.session_id, interval=5)
-        self.system_tracker  = SystemTracker(interval=30)
-        self.trigger_engine  = TriggerEngine(
+        self.window_tracker = WindowTracker(self.session_id, interval=5)
+        self.system_tracker = SystemTracker(interval=30)
+        self.trigger_engine = TriggerEngine(
             session_id=self.session_id,
-            on_trigger=self.on_emiya_speak
+            on_trigger=self.on_emiya_speak,
         )
-        self.mood_engine     = MoodEngine()   # ← новый движок
-        self.last_sys        = {}
-        self.clients         = set()
+        self.mood_engine = MoodEngine()
+        self.memory_store = MemoryStore()
+        self.memory_store.init_schema()
+        self.memory_writer = MemoryWriter(self.memory_store)
+        self.memory_retriever = MemoryRetriever(self.memory_store)
+        self.traits = load_traits()
+        self.last_sys = {}
+        self.clients = set()
         self.pending_message = None
-        self.chat_history    = []
-        self._l1             = None
-        self._last_states    = set()          # чтобы не нагружать nudge каждые 5с
+        self.chat_history = []
+        self._l1 = None
+        self._last_states = set()
         self._current_states = {"normal"}
-        self._current_apps   = []
-        self._current_stats  = self.session_tracker.get_stats()
-        self._chat_lock      = None
+        self._current_apps = []
+        self._current_stats = self.session_tracker.get_stats()
+        self._chat_lock = None
 
     def get_l1(self):
         if self._l1 is None:
             try:
                 from models.l1 import chat
+
                 self._l1 = chat
             except Exception:
                 self._l1 = False
@@ -73,14 +88,14 @@ class EmiyaServer:
 
     def analyze_state(self):
         states = set()
-        stats  = self.session_tracker.get_stats()
+        stats = self.session_tracker.get_stats()
 
         if stats["is_afk"]:
             states.add("afk")
             return states
 
         switches = get_switch_count(self.session_id, minutes=10)
-        apps     = get_app_time(self.session_id, minutes=30)
+        apps = get_app_time(self.session_id, minutes=30)
 
         if switches >= SCATTERED_SWITCHES:
             states.add("scattered")
@@ -105,13 +120,28 @@ class EmiyaServer:
             if state in STATE_NUDGES:
                 axis, delta = STATE_NUDGES[state]
                 self.mood_engine.nudge(axis, delta)
-                print(f"[Mood] nudge от '{state}': {axis} {delta:+.1f}")
+                print(f"[Mood] nudge from '{state}': {axis} {delta:+.1f}")
+                try:
+                    self.memory_writer.write_observation(
+                        f"state detected: {state}",
+                        mood_snapshot=self._mood_context(),
+                        tags=[state],
+                    )
+                except Exception as e:
+                    print(f"[Memory] observation write error: {e}")
         self._last_states = states
 
     def on_emiya_speak(self, trigger, message):
-        """Вызывается TriggerEngine когда L0 сгенерировала реплику."""
         self.pending_message = {"trigger": trigger, "message": message}
         self.chat_history.append({"role": "assistant", "content": message})
+        try:
+            self.memory_writer.write_trigger_event(
+                trigger,
+                message,
+                mood_snapshot=self._mood_context(),
+            )
+        except Exception as e:
+            print(f"[Memory] trigger write error: {e}")
         print(f"\n[EMIYA] {message}\n")
 
     def on_system_update(self, snapshot):
@@ -120,6 +150,14 @@ class EmiyaServer:
     def handle_user_message(self, text):
         turn_id = uuid.uuid4().hex
         mood = self._mood_context()
+        context = self._build_context(user_text=text)
+        pipeline_logger.start_request(turn_id, text, context)
+        pipeline_logger.add_step(
+            turn_id,
+            "INPUT",
+            details={"chars": len(text), "history": len(self.chat_history)},
+        )
+
         self.chat_history.append({"role": "user", "content": text})
         log_chat_message(
             session_id=self.session_id,
@@ -132,20 +170,36 @@ class EmiyaServer:
 
         l1_fn = self.get_l1()
         if l1_fn:
-            context = self._build_context()
             try:
-                # передаём текущий mood в context — L1 подхватит его сам
+                started = time.perf_counter()
                 result = l1_fn(self.chat_history[-10:], context, return_metadata=True)
+                latency_ms = (time.perf_counter() - started) * 1000
                 if isinstance(result, dict):
                     response = result.get("content")
                     thought = result.get("thought")
                     raw_response = result.get("raw_response")
                     model = result.get("model")
+                    system_prompt = result.get("system_prompt")
+                    mood_seed = result.get("mood_seed")
                 else:
                     response = result
                     thought = None
                     raw_response = None
                     model = None
+                    system_prompt = None
+                    mood_seed = None
+
+                pipeline_logger.add_step(
+                    turn_id,
+                    "L1",
+                    latency_ms=latency_ms,
+                    details={
+                        "model": model,
+                        "mood_seed": mood_seed,
+                        "system_prompt": system_prompt,
+                    },
+                )
+
                 if response:
                     self.chat_history.append({"role": "assistant", "content": response})
                     log_chat_message(
@@ -159,9 +213,22 @@ class EmiyaServer:
                         model=model,
                         mood=context.get("mood"),
                     )
+                    self.memory_writer.write_conversation(
+                        text,
+                        response,
+                        mood_snapshot=context.get("mood"),
+                        tags=["l1"],
+                    )
+                    pipeline_logger.add_step(
+                        turn_id,
+                        "OUT",
+                        details={"chars": len(response), "source": "l1"},
+                    )
+                    pipeline_logger.finish_request(turn_id, "ok")
                     return response
             except Exception as e:
-                print(f"[L1] ошибка: {e}")
+                print(f"[L1] error: {e}")
+                pipeline_logger.add_step(turn_id, "L1", status="error", details={"error": str(e)})
 
         log_chat_message(
             session_id=self.session_id,
@@ -171,83 +238,110 @@ class EmiyaServer:
             turn_id=turn_id,
             mood=mood,
         )
+        self.memory_writer.write_conversation(
+            text,
+            "...",
+            mood_snapshot=mood,
+            importance=0.2,
+            tags=["fallback"],
+        )
+        pipeline_logger.add_step(turn_id, "OUT", details={"chars": 3, "source": "fallback"})
+        pipeline_logger.finish_request(turn_id, "fallback")
         return "..."
 
-    def _build_context(self) -> dict:
-        stats  = self.session_tracker.get_stats()
+    def _build_context(self, user_text: str | None = None) -> dict:
+        stats = self.session_tracker.get_stats()
         states = self.analyze_state()
-        apps   = get_app_time(self.session_id, minutes=30)
+        apps = get_app_time(self.session_id, minutes=30)
+        mood = self._mood_context()
 
-        return {
+        context = {
             "time_of_day": stats["time_of_day"],
-            "active_min":  stats["active_minutes"],
-            "is_afk":      stats["is_afk"],
-            "states":      list(states),
-            "apps":        apps[:5],
-            "cpu":         self.last_sys.get("cpu_percent", 0),
-            "ram":         self.last_sys.get("ram_percent", 0),
-            "mood":        self._mood_context(),
+            "active_min": stats["active_minutes"],
+            "is_afk": stats["is_afk"],
+            "states": list(states),
+            "apps": apps[:5],
+            "cpu": self.last_sys.get("cpu_percent", 0),
+            "ram": self.last_sys.get("ram_percent", 0),
+            "mood": mood,
+            "traits": self.traits.to_dict(),
         }
+
+        try:
+            recent = self.memory_retriever.get_recent(8)
+            relevant = self.memory_retriever.search(user_text or "", limit=4)
+            mood_matches = self.memory_retriever.by_mood(mood, limit=3)
+            seen = {memory["id"] for memory in relevant}
+            relevant.extend(memory for memory in mood_matches if memory["id"] not in seen)
+            context["recent_memory"] = recent
+            context["relevant_memory"] = relevant[:6]
+        except Exception as e:
+            print(f"[Memory] retrieval error: {e}")
+            context["recent_memory"] = []
+            context["relevant_memory"] = []
+
+        return context
 
     def _mood_context(self) -> dict:
         mood = self.mood_engine.get_current()
         return {
-            "energy":   round(mood.energy, 3),
-            "focus":    round(mood.focus, 3),
+            "energy": round(mood.energy, 3),
+            "focus": round(mood.focus, 3),
             "openness": round(mood.openness, 3),
         }
 
     def build_state_packet(self):
-        stats      = self.session_tracker.get_stats()
-        states     = self._current_states
-        apps       = self._current_apps
+        stats = self.session_tracker.get_stats()
+        states = self._current_states
+        apps = self._current_apps
         mood_state = self.mood_engine.get_state()
-        sys_state  = {
-            "cpu_pct":      self.last_sys.get("cpu_percent", 0),
-            "ram_pct":      self.last_sys.get("ram_percent", 0),
-            "ram_used_gb":  self.last_sys.get("ram_used_gb"),
+        sys_state = {
+            "cpu_pct": self.last_sys.get("cpu_percent", 0),
+            "ram_pct": self.last_sys.get("ram_percent", 0),
+            "ram_used_gb": self.last_sys.get("ram_used_gb"),
             "ram_total_gb": self.last_sys.get("ram_total_gb"),
             "top_processes": self.last_sys.get("top_processes", []),
         }
         params = {
             "sigma": mood_state.sigma,
-            "rho":   mood_state.rho,
-            "beta":  round(mood_state.beta, 4),
+            "rho": mood_state.rho,
+            "beta": round(mood_state.beta, 4),
         }
 
         packet = {
-            "type":        "state_update",
-            "time":        datetime.now().strftime("%H:%M:%S"),
-            "timestamp":   datetime.now().isoformat(timespec="milliseconds"),
+            "type": "state_update",
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "timestamp": datetime.now().isoformat(timespec="milliseconds"),
             "time_of_day": stats["time_of_day"],
-            "active_min":  stats["active_minutes"],
+            "active_min": stats["active_minutes"],
             "active_minutes": stats["active_minutes"],
-            "is_afk":      stats["is_afk"],
-            "states":      list(states),
-            "apps":        apps[:5],
-            "cpu":         self.last_sys.get("cpu_percent", 0),
-            "ram":         self.last_sys.get("ram_percent", 0),
-            "sys":         sys_state,
-            "params":      params,
-            "models":      {"L-meta": "active", "L0": "active", "L1": "standby", "L2": "offline"},
-            "emiya":       self.pending_message,
-
+            "is_afk": stats["is_afk"],
+            "states": list(states),
+            "apps": apps[:5],
+            "cpu": self.last_sys.get("cpu_percent", 0),
+            "ram": self.last_sys.get("ram_percent", 0),
+            "sys": sys_state,
+            "params": params,
+            "models": {"L-meta": "active", "L0": "active", "L1": "standby", "L2": "offline"},
+            "emiya": self.pending_message,
+            "traits": self.traits.to_dict(),
+            "pipeline": pipeline_logger.recent(20, compact=True),
             "mood": {
-                "x":        round(mood_state.x, 4),
-                "y":        round(mood_state.y, 4),
-                "z":        round(mood_state.z, 4),
-                "energy":   round(mood_state.energy, 3),
-                "focus":    round(mood_state.focus, 3),
+                "x": round(mood_state.x, 4),
+                "y": round(mood_state.y, 4),
+                "z": round(mood_state.z, 4),
+                "energy": round(mood_state.energy, 3),
+                "focus": round(mood_state.focus, 3),
                 "openness": round(mood_state.openness, 3),
-                "raw_x":    round(mood_state.raw_x, 2),
-                "raw_y":    round(mood_state.raw_y, 2),
-                "raw_z":    round(mood_state.raw_z, 2),
-                "sigma":    params["sigma"],
-                "rho":      params["rho"],
-                "beta":     params["beta"],
+                "raw_x": round(mood_state.raw_x, 2),
+                "raw_y": round(mood_state.raw_y, 2),
+                "raw_z": round(mood_state.raw_z, 2),
+                "sigma": params["sigma"],
+                "rho": params["rho"],
+                "beta": params["beta"],
                 "timestamp": mood_state.timestamp,
             },
-            "trail": mood_state.trail[-200:],  # последние 200 точек для canvas
+            "trail": mood_state.trail[-200:],
         }
         self.pending_message = None
         return packet
@@ -255,72 +349,93 @@ class EmiyaServer:
     async def broadcast(self, packet):
         if not self.clients:
             return
-        msg = json.dumps(packet)
+        msg = json.dumps(packet, ensure_ascii=False)
         await asyncio.gather(
             *[client.send(msg) for client in self.clients],
-            return_exceptions=True
+            return_exceptions=True,
         )
+
+    def _update_traits(self, patch: dict) -> None:
+        clean_patch = {key: patch[key] for key in TRAIT_KEYS if key in patch}
+        self.traits = save_traits(self.traits.updated(clean_patch))
 
     async def handler(self, websocket):
         self.clients.add(websocket)
-        print(f"[WS] клиент подключён")
+        print("[WS] client connected")
         try:
             async for msg in websocket:
                 data = json.loads(msg)
 
                 if data.get("type") == "user_message":
-                    text     = data.get("text", "")
+                    text = data.get("text", "")
                     print(f"[USER] {text}")
                     if self._chat_lock is None:
                         self._chat_lock = asyncio.Lock()
                     async with self._chat_lock:
                         response = await asyncio.to_thread(self.handle_user_message, text)
-                    await websocket.send(json.dumps({
-                        "type":    "emiya_reply",
-                        "message": response,
-                    }, ensure_ascii=False))
+                    await websocket.send(
+                        json.dumps(
+                            {
+                                "type": "emiya_reply",
+                                "message": response,
+                            },
+                            ensure_ascii=False,
+                        )
+                    )
 
                 elif data.get("type") == "mood_params":
                     sigma = data.get("sigma")
-                    rho   = data.get("rho")
-                    beta  = data.get("beta")
+                    rho = data.get("rho")
+                    beta = data.get("beta")
                     self.mood_engine.set_params(sigma=sigma, rho=rho, beta=beta)
-                    print(f"[Mood] параметры обновлены: sigma={sigma} rho={rho} beta={beta}")
+                    print(f"[Mood] params updated: sigma={sigma} rho={rho} beta={beta}")
 
                 elif data.get("type") == "mood_preset":
                     name = data.get("name", "standard")
-                    ok   = self.mood_engine.set_preset(name)
-                    print(f"[Mood] пресет '{name}': {'ok' if ok else 'не найден'}")
+                    ok = self.mood_engine.set_preset(name)
+                    print(f"[Mood] preset '{name}': {'ok' if ok else 'not found'}")
 
-        except Exception:
-            pass
+                elif data.get("type") == "personality_update":
+                    self._update_traits(data.get("traits") or data)
+                    print(f"[Traits] updated: {self.traits.to_dict()}")
+
+                elif data.get("type") == "personality_preset":
+                    name = data.get("name", "default")
+                    try:
+                        self.traits = apply_preset(name)
+                        print(f"[Traits] preset '{name}': ok")
+                    except ValueError:
+                        print(f"[Traits] preset '{name}': not found")
+
+        except Exception as e:
+            print(f"[WS] handler error: {e}")
         finally:
             self.clients.discard(websocket)
-            print(f"[WS] клиент отключился")
+            print("[WS] client disconnected")
 
     def run_trackers(self):
         threading.Thread(target=self.window_tracker.start, daemon=True).start()
         threading.Thread(
             target=lambda: self.system_tracker.start(callback=self.on_system_update),
-            daemon=True
+            daemon=True,
         ).start()
 
     def monitor_tick(self):
         self.session_tracker.ping()
         states = self.analyze_state()
-        stats  = self.session_tracker.get_stats()
-        apps   = get_app_time(self.session_id, minutes=30)
+        stats = self.session_tracker.get_stats()
+        apps = get_app_time(self.session_id, minutes=30)
 
         self._current_states = states
-        self._current_stats  = stats
-        self._current_apps   = apps[:5]
+        self._current_stats = stats
+        self._current_apps = apps[:5]
 
-        for s in states:
-            log_state(s, self.session_id)
+        for state in states:
+            log_state(state, self.session_id)
 
         self.apply_mood_nudges(states)
 
-        trigger_context = {**stats, "apps": apps}
+        trigger_context = {**stats, "apps": apps, "traits": self.traits.to_dict()}
         self.trigger_engine.check(
             states,
             trigger_context,
@@ -346,9 +461,9 @@ class EmiyaServer:
     async def main(self):
         self.run_trackers()
         asyncio.create_task(self.mood_engine.run())
-        print(f"[Mood] движок запущен")
+        print("[Mood] engine started")
 
-        print(f"[EMIYA] сервер -> ws://{HOST}:{PORT}")
+        print(f"[EMIYA] server -> ws://{HOST}:{PORT}")
         async with websockets.serve(self.handler, HOST, PORT):
             await self.loop()
 
