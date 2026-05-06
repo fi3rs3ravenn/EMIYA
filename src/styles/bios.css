@@ -787,3 +787,138 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* Sprint 2 scaffold: personality + pipeline */
+.trait-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.trait-preset {
+  min-height: 24px;
+  border: 1px solid var(--border-active);
+  background: transparent;
+  color: var(--mint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.trait-preset:hover {
+  background: var(--mint-dim);
+}
+
+.trait-list {
+  display: grid;
+  gap: 10px;
+}
+
+.trait-row {
+  display: grid;
+  gap: 4px;
+}
+
+.trait-row__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+}
+
+.trait-row__label {
+  color: var(--text-faint);
+  letter-spacing: 0.15em;
+}
+
+.trait-row__value {
+  color: var(--mint);
+  font-variant-numeric: tabular-nums;
+}
+
+.trait-row__slider {
+  width: 100%;
+  accent-color: var(--mint);
+}
+
+.trait-row__hint {
+  color: var(--text-faint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pipeline-chain {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pipeline-step {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  background: var(--bg-deep);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  padding: 5px 4px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.pipeline-step--ok {
+  border-color: var(--border-active);
+  color: var(--mint);
+  background: var(--mint-dim);
+}
+
+.pipeline-step--active {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.pipeline-step--error {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.pipeline-step__label {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pipeline-step__latency {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipeline-meta,
+.pipeline-empty {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipeline-details {
+  max-height: 150px;
+  overflow: auto;
+  margin: 10px 0 0 0;
+  padding: 8px;
+  border: 1px dashed var(--border);
+  background: var(--bg-deep);
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

@@ -34,6 +34,8 @@ import LorenzPanel    from './components/LorenzPanel';
 import ParamsReadout  from './components/ParamsReadout';
 import MoodInfluence  from './components/MoodInfluence';
 import ModelsPanel    from './components/ModelsPanel';
+import PersonalityPanel from './components/PersonalityPanel';
+import PipelineView    from './components/PipelineView';
 import SystemPanel    from './components/SystemPanel';
 import WindowsPanel   from './components/WindowsPanel';
 import AsciiArtZone   from './components/AsciiArtZone';
@@ -53,6 +55,14 @@ const TABS = [
   { id: 'patterns', label: 'PATTERNS' },
   { id: 'log',      label: 'LOG'      },
 ];
+
+const DEFAULT_TRAITS = {
+  curiosity: 70,
+  bluntness: 80,
+  warmth: 40,
+  sarcasm: 60,
+  formality: 20,
+};
 
 const hasNumber = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -123,6 +133,8 @@ export default function App() {
   const [activeMinutes, setActiveMinutes] = useState(0);
   const [influence,     setInfluence]     = useState([]);
   const [moodHistory,   setMoodHistory]   = useState([]);
+  const [traits,        setTraits]        = useState(DEFAULT_TRAITS);
+  const [pipeline,      setPipeline]      = useState([]);
 
   /* ─── chat ─── */
   const [messages,      setMessages]      = useState([]);
@@ -187,6 +199,8 @@ export default function App() {
             const active = payload.active_minutes ?? payload.active_min;
             if (typeof active === 'number') setActiveMinutes(active);
             if (payload.influence)    setInfluence(payload.influence);
+            if (payload.traits)       setTraits((current) => ({ ...current, ...payload.traits }));
+            if (payload.pipeline)     setPipeline(payload.pipeline);
 
             const autonomous = toTriggerEvent(payload.emiya, payload.timestamp);
             if (autonomous) {
@@ -281,6 +295,17 @@ export default function App() {
     wsRef.current.send(JSON.stringify({ type: 'user_message', text }));
   };
 
+  const handleTraitsChange = (nextTraits) => {
+    setTraits(nextTraits);
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: 'personality_update', traits: nextTraits }));
+  };
+
+  const handleTraitsPreset = (name) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: 'personality_preset', name }));
+  };
+
   /* ─── BANK content ─── */
   /* BANK_1: что у emiya в голове сейчас — последние mood-фрагменты + последний trigger */
   const lastTrigger = triggerEvents.length > 0 ? triggerEvents[triggerEvents.length - 1] : null;
@@ -368,7 +393,13 @@ export default function App() {
           />
           <ParamsReadout params={params} />
           <MoodInfluence events={influence} />
+          <PersonalityPanel
+            traits={traits}
+            onChange={handleTraitsChange}
+            onPreset={handleTraitsPreset}
+          />
           <ModelsPanel models={models} />
+          <PipelineView runs={pipeline} />
         </aside>
       </div>
 
