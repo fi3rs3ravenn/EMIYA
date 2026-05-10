@@ -38,7 +38,17 @@ def _build_system(mood: dict | None, traits: dict | None = None) -> str:
     except Exception as e:
         print(f"[L0] traits injection error: {e}")
 
-    return "\n\n".join([*blocks, SYSTEM_PROMPT]) if blocks else SYSTEM_PROMPT
+    blocks.append(SYSTEM_PROMPT)
+    blocks.append(
+        """
+<instruction>
+respond only in english.
+one or two short sentences.
+do not mention system labels, mood, traits, or internal state names.
+</instruction>
+""".strip()
+    )
+    return "\n\n".join(blocks)
 
 
 def _build_options(mood: dict | None) -> dict:
@@ -60,22 +70,22 @@ def build_user_prompt(trigger: str, context: dict) -> str:
     top_app = apps[0]["app"].replace(".exe", "") if apps else "unknown"
 
     situations = {
-        "grinding": f"пользователь работает уже {int(active_min)} минут без перерыва. приложение: {top_app}.",
-        "late_night_grinding": f"сейчас {hour}:00 ночи. работает уже {int(active_min)} минут. приложение: {top_app}.",
-        "scattered": f"хаотично переключается между приложениями уже {int(active_min)} минут.",
-        "idle_loop": "ходит по кругу между одними и теми же окнами.",
-        "late_night": f"сейчас {hour}:00 ночи. всё ещё за компьютером.",
-        "afk_return": "вернулся после перерыва.",
-        "first_start": "только что начал сессию.",
+        "grinding": f"the user has been working for {int(active_min)} minutes without a break. app: {top_app}.",
+        "late_night_grinding": f"it is {hour}:00 at night. the user has been working for {int(active_min)} minutes. app: {top_app}.",
+        "scattered": f"the user has been switching between apps chaotically for {int(active_min)} minutes.",
+        "idle_loop": "the user is circling through the same windows.",
+        "late_night": f"it is {hour}:00 at night. the user is still at the computer.",
+        "afk_return": "the user returned after a break.",
+        "first_start": "the user just started the session.",
     }
 
-    situation = situations.get(trigger, "наблюдает за пользователем.")
-    return f"ситуация: {situation}\nскажи что-нибудь. одно-два предложения, не больше. /no_think"
+    situation = situations.get(trigger, "you are observing the user.")
+    return f"situation: {situation}\nsay something. one or two sentences, no more. /no_think"
 
 
 def _clean(text: str) -> str:
     text = strip_speaker_prefix(text)
-    text = text.lower().replace("!", ".")
+    text = text.replace("!", ".")
     sentences = [sentence.strip() for sentence in text.split(".") if sentence.strip()]
     result = ". ".join(sentences[:2])
     if result and not result.endswith("."):

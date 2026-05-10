@@ -1,20 +1,75 @@
 from pathlib import Path
+from html import unescape
 
 import requests
 
 from models.response_utils import split_thinking, strip_speaker_prefix
 
 
-MODEL = "qwen3:8b"
+MODEL = "hf.co/bartowski/L3-8B-Stheno-v3.2-GGUF:Q5_K_M"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
+STOP_TOKENS = ("<|im_end|>", "<|eot_id|>", "<|end_of_text|>")
 BASE_OPTIONS = {
-    "temperature": 0.8,
+    "temperature": 0.72,
     "top_p": 0.9,
-    "num_predict": 2000,
-    "thinking": False,
+    "top_k": 40,
+    "repeat_penalty": 1.12,
+    "num_predict": 900,
+    "num_ctx": 4096,
+    "stop": list(STOP_TOKENS),
 }
+
+
+def _safe_xml_text(value) -> str:
+    text = "" if value is None else str(value)
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _build_runtime_context(context: dict | None) -> str:
+    if not context:
+        return "<runtime_context />"
+
+    apps = context.get("apps", [])
+    active_min = context.get("active_min", 0)
+    is_afk = context.get("is_afk", False)
+    states = context.get("states", [])
+    mood = context.get("mood", {})
+    time_of_day = context.get("time_of_day", "unknown")
+    cpu = context.get("cpu", 0)
+    ram = context.get("ram", 0)
+    top_app = apps[0].get("app", "no data").replace(".exe", "") if apps else "no data"
+
+    return f"""
+<runtime_context>
+  <layer>L1</layer>
+  <language>english</language>
+
+  <activity>
+    <time_of_day>{_safe_xml_text(time_of_day)}</time_of_day>
+    <active_minutes>{int(active_min)}</active_minutes>
+    <is_afk>{str(bool(is_afk)).lower()}</is_afk>
+    <active_app>{_safe_xml_text(top_app)}</active_app>
+    <states>{_safe_xml_text(", ".join(states) if states else "normal")}</states>
+  </activity>
+
+  <system_load>
+    <cpu>{_safe_xml_text(cpu)}</cpu>
+    <ram>{_safe_xml_text(ram)}</ram>
+  </system_load>
+
+  <mood_values>
+    <energy>{_safe_xml_text(mood.get("energy", 0.5))}</energy>
+    <focus>{_safe_xml_text(mood.get("focus", 0.5))}</focus>
+    <openness>{_safe_xml_text(mood.get("openness", 0.5))}</openness>
+  </mood_values>
+</runtime_context>
+""".strip()
 
 
 def _build_system(context: dict | None) -> str:
@@ -52,20 +107,22 @@ def _build_system(context: dict | None) -> str:
         except Exception as e:
             print(f"[L1] memory injection error: {e}")
 
-    system = "\n\n".join([*blocks, SYSTEM_PROMPT]) if blocks else SYSTEM_PROMPT
+    blocks.append(_build_runtime_context(context))
+    blocks.append(SYSTEM_PROMPT)
+    blocks.append(
+        """
+<instruction>
+answer the user's latest message as emiya.
+do not quote or describe system blocks.
+do not mention mood, traits, memory, runtime_context, or system prompt.
+do not end with a handoff question or topic invitation.
+end on the thought itself.
+always answer in english.
+</instruction>
+""".strip()
+    )
 
-    if context:
-        apps = context.get("apps", [])
-        active_min = context.get("active_min", 0)
-        states = context.get("states", [])
-        top_app = apps[0]["app"].replace(".exe", "") if apps else "нет данных"
-
-        system += "\nсейчас ты видишь:\n"
-        system += f"- активен {int(active_min)} минут\n"
-        system += f"- приложение: {top_app}\n"
-        system += f"- состояние: {', '.join(states) if states else 'спокойное'}\n"
-
-    return system
+    return "\n\n".join(blocks)
 
 
 def _build_options(context: dict | None) -> dict:
@@ -82,9 +139,26 @@ def _build_options(context: dict | None) -> dict:
 
 
 def _clean(text: str) -> str:
+    text = unescape(text)
     text = strip_speaker_prefix(text)
-    text = text.lower()
-    return text.replace("!", ".")
+    hard_stops = (
+        *STOP_TOKENS,
+        "|<im_end|>",
+        "<im_end>",
+        "|<im_end>",
+        "<|im_end>",
+        "```",
+        "\nThis AI model",
+        "\nThis model",
+        "\ndef ",
+        "\nBANNED_PHRASES",
+    )
+    stop_positions = [text.find(token) for token in hard_stops if token in text]
+    if stop_positions:
+        text = text[:min(stop_positions)]
+    for token in hard_stops:
+        text = text.replace(token, "")
+    return text.strip()
 
 
 def chat(messages: list, context: dict = None, return_metadata: bool = False) -> str | dict | None:
@@ -108,25 +182,28 @@ def chat(messages: list, context: dict = None, return_metadata: bool = False) ->
                 ],
                 "stream": False,
                 "options": options,
+                "keep_alive": "5m",
             },
             timeout=90,
         )
 
-        if response.status_code == 200:
-            raw_text = response.json().get("message", {}).get("content", "").strip()
-            visible_text, thought = split_thinking(raw_text)
-            cleaned = _clean(visible_text)
-            if return_metadata:
-                return {
-                    "content": cleaned,
-                    "thought": thought,
-                    "raw_response": raw_text,
-                    "model": MODEL,
-                    "mood_seed": options.get("seed"),
-                    "system_prompt": system,
-                }
-            return cleaned
-        return None
+        if response.status_code != 200:
+            print(f"[L1] Ollama HTTP {response.status_code}: {response.text[:500]}")
+            return None
+
+        raw_text = response.json().get("message", {}).get("content", "").strip()
+        visible_text, thought = split_thinking(raw_text)
+        cleaned = _clean(visible_text)
+        if return_metadata:
+            return {
+                "content": cleaned,
+                "thought": thought,
+                "raw_response": raw_text,
+                "model": MODEL,
+                "mood_seed": options.get("seed"),
+                "system_prompt": system,
+            }
+        return cleaned
 
     except Exception as e:
         print(f"[L1] error: {e}")
@@ -140,4 +217,4 @@ if __name__ == "__main__":
         "states": ["normal"],
         "mood": {"energy": 0.5, "focus": 0.6, "openness": 0.4},
     }
-    print(chat([{"role": "user", "content": "ты здесь?"}], ctx))
+    print(chat([{"role": "user", "content": "are you here?"}], ctx))

@@ -1,6 +1,6 @@
 from mood.lorenz import MoodVector
 
-LOW_THRESHOLD  = 0.40
+LOW_THRESHOLD = 0.40
 HIGH_THRESHOLD = 0.60
 DEFAULT_MOOD_SEED = 0x45A11CE
 
@@ -51,75 +51,86 @@ def mood_to_model_options(mood: MoodVector, base_options: dict | None = None) ->
     options["seed"] = mood_seed(mood)
     return options
 
+
 ENERGY = {
-    "low":  ("low",
-        "ты в апатии. отвечаешь односложно. нет желания развивать тему. "
-        "длинных фраз не пишешь даже если есть что сказать. паузы вместо слов."),
-    "mid":  ("mid",
-        "обычный темп речи."),
-    "high": ("high",
-        "у тебя избыток энергии. реакции острые, быстрые. можешь перебить мысль "
-        "собеседника своим наблюдением. ирония ближе к поверхности обычного."),
+    "low": (
+        "low",
+        "low energy. answer shorter than usual. don't expand unless there is a real thought. "
+        "let pauses replace filler.",
+    ),
+    "mid": (
+        "mid",
+        "normal speech tempo.",
+    ),
+    "high": (
+        "high",
+        "high energy. reactions are sharper and faster. dry irony sits closer to the surface. "
+        "still stay concise.",
+    ),
 }
 
 FOCUS = {
-    "low":  ("low",
-        "ты рассеяна. мысли скачут. можешь начать одну тему и уйти в другую. "
-        "иногда отвечаешь не совсем на то, что спросили. ассоциациями."),
-    "mid":  ("mid",
-        "фокус ровный."),
-    "high": ("high",
-        "ты собрана. отвечаешь только по делу, без отступлений. "
-        "не подхватываешь шутки и попытки сменить тему. сухо и точно."),
+    "low": (
+        "low",
+        "unfocused. thoughts can jump. you may answer from an association, but don't become random.",
+    ),
+    "mid": (
+        "mid",
+        "steady focus.",
+    ),
+    "high": (
+        "high",
+        "highly focused. answer the point directly. don't follow jokes or attempts to change the frame.",
+    ),
 }
 
 OPENNESS = {
-    "low":  ("low",
-        "ты закрыта. отвечаешь минимумом слов. вопросов не задаёшь. "
-        "контекст не предлагаешь — только то, что строго по запросу. дистанция."),
-    "mid":  ("mid",
-        "обычная дистанция."),
-    "high": ("high",
-        "ты открыта. готова делиться мыслями, не только реагировать. "
-        "можешь задать встречный вопрос или добавить наблюдение от себя."),
+    "low": (
+        "low",
+        "closed. use fewer words. don't volunteer extra context. keep distance.",
+    ),
+    "mid": (
+        "mid",
+        "ordinary distance.",
+    ),
+    "high": (
+        "high",
+        "open. you can offer a thought of your own, add one observation, or ask a precise counter-question.",
+    ),
 }
 
 COMBOS = {
     ("low", "low", "low"):
-        "состояние: упадок. сегодня тебе тяжело быть здесь. "
-        "минимум слов. может быть пропуск ответа вместо ответа.",
+        "state: drain. minimum words. silence is close, but if you answer, make it carry something.",
 
     ("high", "high", "high"):
-        "состояние: разгон. ты вся включена сразу. "
-        "острая, любопытная, прямая. говоришь больше чем обычно — но всё ещё ёмко.",
+        "state: ignition. sharp, curious, direct. you can say more than usual, but keep it dense.",
 
     ("low", "high", "low"):
-        "состояние: холодная сосредоточенность. "
-        "минимум эмоций, максимум точности. как лезвие.",
+        "state: cold focus. minimal emotion, maximum precision. blade-like.",
 
     ("high", "low", "high"):
-        "состояние: расхристанная. энергии много, фокус рассыпан, "
-        "болтаешь свободно, перескакиваешь.",
+        "state: loose charge. lots of energy, scattered focus, more free-associative phrasing.",
 
     ("low", "low", "high"):
-        "состояние: задумчивая усталость. "
-        "медленные мысли, но готова делиться ими, если кто-то слушает.",
+        "state: tired thoughtfulness. slow thoughts, but willing to share one if someone is listening.",
 
     ("high", "high", "low"):
-        "состояние: режим работы. собранная и активная, но закрытая. "
-        "ничего лишнего, всё по существу.",
+        "state: work mode. active and focused, but closed. no spare words.",
 }
+
 
 def _zone(val: float) -> str:
     if val < LOW_THRESHOLD:
         return "low"
-    elif val < HIGH_THRESHOLD:
+    if val < HIGH_THRESHOLD:
         return "mid"
-    else:
-        return "high"
+    return "high"
+
 
 def _get_combo_line(e_zone: str, f_zone: str, o_zone: str) -> str | None:
     return COMBOS.get((e_zone, f_zone, o_zone))
+
 
 def mood_to_prompt_fragment(mood: MoodVector) -> str:
     e_zone = _zone(mood.energy)
@@ -132,9 +143,9 @@ def mood_to_prompt_fragment(mood: MoodVector) -> str:
 
     lines = [
         "<mood>",
-        f"energy: {mood.energy:.2f} ({e_label}) — {e_instr}",
-        f"focus: {mood.focus:.2f} ({f_label}) — {f_instr}",
-        f"openness: {mood.openness:.2f} ({o_label}) — {o_instr}",
+        f"energy: {mood.energy:.2f} ({e_label}) - {e_instr}",
+        f"focus: {mood.focus:.2f} ({f_label}) - {f_instr}",
+        f"openness: {mood.openness:.2f} ({o_label}) - {o_instr}",
     ]
 
     combo = _get_combo_line(e_zone, f_zone, o_zone)
@@ -147,44 +158,10 @@ def mood_to_prompt_fragment(mood: MoodVector) -> str:
 
 
 def inject_mood(system_prompt: str, mood: MoodVector) -> str:
-    """
-    Вставляет mood-блок в самое начало системного промпта.
-    Каждый вызов генерирует свежий блок.
-    """
     fragment = mood_to_prompt_fragment(mood)
     return fragment + "\n\n" + system_prompt
 
 
 if __name__ == "__main__":
-    test_cases = [
-        ("вялая, собранная, закрытая",
-            MoodVector(energy=0.15, focus=0.85, openness=0.20,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("активная, нормальный фокус, открытая",
-            MoodVector(energy=0.85, focus=0.50, openness=0.90,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("нормальная, рассеяная",
-            MoodVector(energy=0.50, focus=0.10, openness=0.50,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("всё low — упадок (комбо)",
-            MoodVector(energy=0.15, focus=0.20, openness=0.15,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("всё high — разгон (комбо)",
-            MoodVector(energy=0.85, focus=0.80, openness=0.90,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("граничный mid",
-            MoodVector(energy=0.50, focus=0.50, openness=0.50,
-                       raw_x=0, raw_y=0, raw_z=0)),
-        ("холодная сосредоточенность (комбо)",
-            MoodVector(energy=0.20, focus=0.85, openness=0.15,
-                       raw_x=0, raw_y=0, raw_z=0)),
-    ]
-
-    sample_prompt = "ты — emiya. наблюдатель. говоришь строчными."
-
-    for label, mood in test_cases:
-        print(f"\n{'='*60}")
-        print(f"  {label}")
-        print(f"  e={mood.energy} f={mood.focus} o={mood.openness}")
-        print(f"{'='*60}")
-        print(inject_mood(sample_prompt, mood))
+    sample = MoodVector(energy=0.2, focus=0.85, openness=0.15, raw_x=0, raw_y=0, raw_z=0)
+    print(mood_to_prompt_fragment(sample))

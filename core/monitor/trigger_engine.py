@@ -1,18 +1,20 @@
 import random
 import uuid
 from datetime import datetime, timedelta
-from monitor.db import log_trigger, log_chat_message
+
+from monitor.db import log_chat_message, log_trigger
+
 
 COOLDOWN_MINUTES = 30
 
 FALLBACK_LINES = {
-    "grinding":            ["долго работаешь. что держит?", "уже давно. всё нормально?"],
-    "late_night_grinding": ["поздно и долго. зачем?", "ночью работается лучше — или не можешь остановиться?"],
-    "scattered":           ["что-то не идёт. или ищешь от чего убежать?", "туда-сюда. что происходит?"],
-    "idle_loop":           ["ходишь по кругу. застрял?", "одни и те же окна. прокрастинация?"],
-    "afk_return":          ["вернулся.", "отдохнул?"],
-    "first_start":         ["вижу как ты работаешь. интересно.", "начинаем."],
-    "late_night":          ["поздно.", "всё ещё здесь."],
+    "grinding": ["long stretch. what is keeping you there?", "you have been at it for a while. still clean?"],
+    "late_night_grinding": ["late and long. why?", "night work again. better focus, or just no brakes?"],
+    "scattered": ["something is slipping. or you are looking for an exit.", "back and forth. what are you avoiding?"],
+    "idle_loop": ["same windows again. stuck?", "circling the same few panes. not subtle."],
+    "afk_return": ["back.", "rested?"],
+    "first_start": ["i see the shape of the session starting.", "we begin."],
+    "late_night": ["late.", "still here."],
 }
 
 
@@ -23,10 +25,10 @@ def get_fallback(trigger):
 
 class TriggerEngine:
     def __init__(self, session_id, on_trigger=None):
-        self.session_id   = session_id
-        self.on_trigger   = on_trigger
-        self.fired_today  = set()
-        self._l0          = None
+        self.session_id = session_id
+        self.on_trigger = on_trigger
+        self.fired_today = set()
+        self._l0 = None
         self._last_fired_at: datetime | None = None
 
     def _is_on_cooldown(self) -> bool:
@@ -38,6 +40,7 @@ class TriggerEngine:
         if self._l0 is None:
             try:
                 from models.l0 import generate
+
                 self._l0 = generate
             except Exception:
                 self._l0 = False
@@ -59,7 +62,7 @@ class TriggerEngine:
                 if isinstance(result, str) and result:
                     return {"content": result, "source": "l0_trigger"}
             except Exception as e:
-                print(f"[TriggerEngine] L0 недоступна: {e}")
+                print(f"[TriggerEngine] L0 unavailable: {e}")
         return {"content": get_fallback(trigger), "source": "fallback_trigger"}
 
     def check(self, states: set, session_stats: dict, mood: dict | None = None):
@@ -67,7 +70,7 @@ class TriggerEngine:
             return None
 
         trigger = None
-        hour    = datetime.now().hour
+        hour = datetime.now().hour
         minutes = session_stats.get("active_minutes", 0)
 
         if "grinding" in states and "late_night" in states:
@@ -88,12 +91,12 @@ class TriggerEngine:
         self.fired_today.add(trigger)
 
         context = {
-            "states":     list(states),
+            "states": list(states),
             "active_min": minutes,
-            "apps":       session_stats.get("apps", []),
-            "hour":       hour,
-            "mood":       mood or {"energy": 0.5, "focus": 0.5, "openness": 0.5},
-            "traits":     session_stats.get("traits"),
+            "apps": session_stats.get("apps", []),
+            "hour": hour,
+            "mood": mood or {"energy": 0.5, "focus": 0.5, "openness": 0.5},
+            "traits": session_stats.get("traits"),
         }
 
         turn_id = uuid.uuid4().hex
