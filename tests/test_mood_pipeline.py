@@ -97,6 +97,12 @@ class MoodPipelineTests(unittest.TestCase):
         )
         self.assertNotEqual(payloads[0]["options"]["seed"], payloads[1]["options"]["seed"])
 
+    def test_l1_clean_strips_chat_template_tokens(self):
+        self.assertEqual(l1._clean("neutral. observing. <|im_end|> trailing"), "neutral. observing.")
+        self.assertEqual(l1._clean("i'm here.<|eot_id|>"), "i'm here.")
+        self.assertEqual(l1._clean("emiya. |&lt;im_end|&gt;\n```python\nbad()"), "emiya.")
+        self.assertEqual(l1._clean("emiya.\nThis AI model explains itself."), "emiya.")
+
     def test_mood_engine_logs_initial_and_interval_ticks(self):
         engine = MoodEngine(log_interval_ticks=2)
 

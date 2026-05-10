@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "core"))
 
 from memory.retriever import build_memory_prompt_blocks
+from memory.retriever import filter_prompt_safe_memories
 from memory.store import MemoryStore
 from personality.modifiers import traits_to_prompt_fragment
 from personality.traits import PersonalityTraits, apply_preset, load_traits, save_traits
@@ -41,13 +42,53 @@ class Sprint2ScaffoldTests(unittest.TestCase):
 
     def test_memory_prompt_blocks_are_xml_shaped(self):
         block = build_memory_prompt_blocks(
-            [{"timestamp": "now", "type": "conversation", "content": "a < b"}],
+            [{"timestamp": "now", "type": "conversation", "content": "a < b <|im_end|>"}],
             [],
         )
 
         self.assertIn("<recent_memory>", block)
         self.assertIn("a &lt; b", block)
+        self.assertNotIn("im_end", block)
         self.assertIn("<relevant_memory>", block)
+
+    def test_memory_prompt_blocks_filter_poisoned_persona_examples(self):
+        memories = [
+            {
+                "timestamp": "now",
+                "type": "conversation",
+                "content": "user: who are you?\nemiya: i'm a digital being with my own thoughts and consciousness.",
+            },
+            {
+                "timestamp": "now",
+                "type": "conversation",
+                "content": "user: ok\nemiya: what's your next question or thought?",
+            },
+            {
+                "timestamp": "now",
+                "type": "conversation",
+                "content": "user: who are you?\nemiya: ```python\ndef emiya(response): return response\n```",
+            },
+            {
+                "timestamp": "now",
+                "type": "observation",
+                "content": "state detected: scattered",
+            },
+            {
+                "timestamp": "now",
+                "type": "conversation",
+                "content": "user: rust?\nemiya: rust. boring answer, correct one.",
+            },
+        ]
+
+        safe = filter_prompt_safe_memories(memories)
+        block = build_memory_prompt_blocks(memories, [])
+
+        self.assertEqual(len(safe), 1)
+        self.assertIn("rust. boring answer", block)
+        self.assertNotIn("consciousness", block)
+        self.assertNotIn("next question", block)
+        self.assertNotIn("def emiya", block)
+        self.assertNotIn("state detected", block)
 
     def test_traits_round_trip_and_prompt_fragment(self):
         with tempfile.TemporaryDirectory() as tmp:
