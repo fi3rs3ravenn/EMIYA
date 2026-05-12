@@ -2,7 +2,12 @@ from pathlib import Path
 
 import requests
 
-from models.response_utils import split_thinking, strip_speaker_prefix
+from models.response_utils import (
+    split_thinking,
+    strip_generation_artifacts,
+    strip_speaker_prefix,
+    take_sentence_prefix,
+)
 
 
 MODEL = "qwen3:4b"
@@ -84,13 +89,11 @@ def build_user_prompt(trigger: str, context: dict) -> str:
 
 
 def _clean(text: str) -> str:
+    text = strip_generation_artifacts(text)
     text = strip_speaker_prefix(text)
+    text = strip_generation_artifacts(text)
     text = text.replace("!", ".")
-    sentences = [sentence.strip() for sentence in text.split(".") if sentence.strip()]
-    result = ". ".join(sentences[:2])
-    if result and not result.endswith("."):
-        result += "."
-    return result
+    return take_sentence_prefix(text, max_sentences=2)
 
 
 def generate(trigger: str, context: dict, return_metadata: bool = False) -> str | dict | None:

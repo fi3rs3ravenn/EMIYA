@@ -1,16 +1,20 @@
 from pathlib import Path
-from html import unescape
 
 import requests
 
-from models.response_utils import split_thinking, strip_speaker_prefix
+from models.response_utils import (
+    GENERATION_STOP_MARKERS,
+    split_thinking,
+    strip_generation_artifacts,
+    strip_speaker_prefix,
+)
 
 
 MODEL = "hf.co/bartowski/L3-8B-Stheno-v3.2-GGUF:Q5_K_M"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
-STOP_TOKENS = ("<|im_end|>", "<|eot_id|>", "<|end_of_text|>")
+STOP_TOKENS = GENERATION_STOP_MARKERS
 BASE_OPTIONS = {
     "temperature": 0.72,
     "top_p": 0.9,
@@ -139,26 +143,9 @@ def _build_options(context: dict | None) -> dict:
 
 
 def _clean(text: str) -> str:
-    text = unescape(text)
+    text = strip_generation_artifacts(text)
     text = strip_speaker_prefix(text)
-    hard_stops = (
-        *STOP_TOKENS,
-        "|<im_end|>",
-        "<im_end>",
-        "|<im_end>",
-        "<|im_end>",
-        "```",
-        "\nThis AI model",
-        "\nThis model",
-        "\ndef ",
-        "\nBANNED_PHRASES",
-    )
-    stop_positions = [text.find(token) for token in hard_stops if token in text]
-    if stop_positions:
-        text = text[:min(stop_positions)]
-    for token in hard_stops:
-        text = text.replace(token, "")
-    return text.strip()
+    return strip_generation_artifacts(text)
 
 
 def chat(messages: list, context: dict = None, return_metadata: bool = False) -> str | dict | None:

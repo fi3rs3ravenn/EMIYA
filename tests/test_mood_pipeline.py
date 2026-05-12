@@ -16,7 +16,7 @@ class FakeResponse:
     status_code = 200
 
     def json(self):
-        return {"message": {"content": "тихо."}}
+        return {"message": {"content": "quiet."}}
 
 
 class MoodPipelineTests(unittest.TestCase):
@@ -82,8 +82,8 @@ class MoodPipelineTests(unittest.TestCase):
             return FakeResponse()
 
         with patch.object(l1.requests, "post", side_effect=fake_post):
-            l1.chat([{"role": "user", "content": "ты здесь?"}], low_context)
-            l1.chat([{"role": "user", "content": "ты здесь?"}], high_context)
+            l1.chat([{"role": "user", "content": "are you here?"}], low_context)
+            l1.chat([{"role": "user", "content": "are you here?"}], high_context)
 
         self.assertIn("energy: 0.20", payloads[0]["messages"][0]["content"])
         self.assertIn("energy: 0.80", payloads[1]["messages"][0]["content"])
@@ -102,6 +102,10 @@ class MoodPipelineTests(unittest.TestCase):
         self.assertEqual(l1._clean("i'm here.<|eot_id|>"), "i'm here.")
         self.assertEqual(l1._clean("emiya. |&lt;im_end|&gt;\n```python\nbad()"), "emiya.")
         self.assertEqual(l1._clean("emiya.\nThis AI model explains itself."), "emiya.")
+
+    def test_l0_clean_strips_chat_template_tokens(self):
+        self.assertEqual(l0._clean("same windows again. stuck? <|im_end|>"), "same windows again. stuck?")
+        self.assertEqual(l0._clean("emiya: first. second. third."), "first. second.")
 
     def test_mood_engine_logs_initial_and_interval_ticks(self):
         engine = MoodEngine(log_interval_ticks=2)
