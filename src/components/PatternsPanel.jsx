@@ -1,11 +1,11 @@
 /**
- * PatternsPanel — placeholder под будущий анализ паттернов поведения.
+ * PatternsPanel - placeholder for future behavior pattern analysis.
  *
- * Что планируется (не сейчас):
- *   - визуализация дневных циклов активности
- *   - паттерны переключения окон
- *   - корреляция mood и активности
- *   - детекция аномалий
+ * Planned later:
+ *   - daily activity cycle visualization
+ *   - window switching patterns
+ *   - mood/activity correlation
+ *   - anomaly detection
  */
 
 export default function PatternsPanel() {

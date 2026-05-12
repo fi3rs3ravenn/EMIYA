@@ -1,9 +1,9 @@
 /**
- * LorenzPanel — canvas с траекторией аттрактора + бары энергии/фокуса/открытости + raw x/y/z.
+ * LorenzPanel - attractor canvas plus energy/focus/openness bars and raw x/y/z.
  *
  * Props:
- *   trail:    [{ x, y, z, energy, focus, openness, timestamp }]   — последние N точек
- *   current:  { energy, focus, openness, raw_x, raw_y, raw_z }    — текущее состояние
+ *   trail:    [{ x, y, z, energy, focus, openness, timestamp }]
+ *   current:  { energy, focus, openness, raw_x, raw_y, raw_z }
  *   onToggleAscii: () => void
  *   asciiMode: bool
  */
@@ -16,7 +16,7 @@ const MINT_DIM = 'rgba(61, 219, 177, 0.2)';
 export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }) {
   const canvasRef = useRef(null);
 
-  /* canvas drawing — 3D-в-2D простая ортогональная проекция (x-y plane, z как яркость) */
+  /* Canvas drawing: simple 3D-to-2D orthogonal projection. */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || asciiMode) return;
@@ -30,7 +30,7 @@ export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }
 
     if (!trail || trail.length === 0) return;
 
-    /* нормализуем raw_x, raw_y, raw_z */
+    /* Normalize raw_x, raw_y, raw_z. */
     const xs = trail.map(p => p.x ?? 0);
     const ys = trail.map(p => p.y ?? 0);
     const zs = trail.map(p => p.z ?? 0);
@@ -45,10 +45,10 @@ export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }
 
     const padding = 24;
 
-    /* trail с угасанием */
+    /* Fade trail. */
     for (let i = 0; i < trail.length; i++) {
       const p = trail[i];
-      const t = i / trail.length;             // 0 = старая, 1 = свежая
+      const t = i / trail.length;             // 0 = oldest, 1 = newest
 
       const px = padding + ((p.x - xMin) / xRange) * (W - padding * 2);
       const py = padding + ((p.y - yMin) / yRange) * (H - padding * 2);
@@ -59,7 +59,7 @@ export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }
       ctx.fillRect(px, py, 1.5, 1.5);
     }
 
-    /* текущая точка */
+    /* Current point. */
     const last = trail[trail.length - 1];
     if (last) {
       const px = padding + ((last.x - xMin) / xRange) * (W - padding * 2);
@@ -75,7 +75,7 @@ export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }
     }
   }, [trail, asciiMode]);
 
-  /* ASCII fallback — простая 60×24 проекция */
+  /* ASCII fallback: simple 60x24 projection. */
   const renderAscii = () => {
     if (!trail || trail.length === 0) return ' '.repeat(60).split('').map(() => '·').join('');
 
@@ -99,7 +99,7 @@ export default function LorenzPanel({ trail, current, asciiMode, onToggleAscii }
       grid[cy][cx] = char;
     });
 
-    /* пульсирующая текущая точка */
+    /* Pulsing current point. */
     const last = trail[trail.length - 1];
     if (last) {
       const cx = Math.floor(((last.x - xMin) / xR) * (W - 1));

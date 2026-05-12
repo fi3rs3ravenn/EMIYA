@@ -29,7 +29,7 @@ class SystemTracker:
 
     def start(self, callback=None):
         self.running = True
-        print("[SystemTracker] запущен")
+        print("[SystemTracker] started")
         while self.running:
             snapshot = self.get_snapshot()
             if callback:
@@ -44,11 +44,11 @@ class SystemTracker:
 
     def stop(self):
         self.running = False
-        print("[SystemTracker] остановлен")
+        print("[SystemTracker] stopped")
 
 if __name__ == "__main__":
     tracker = SystemTracker(interval=5)
-    print("мониторим систему (Ctrl+C для остановки)...")
+    print("monitoring system (Ctrl+C to stop)...")
     try:
         tracker.start()
     except KeyboardInterrupt:

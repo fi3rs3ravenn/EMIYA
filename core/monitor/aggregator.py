@@ -27,11 +27,11 @@ class Aggregator:
         self.running         = False
 
     def on_emiya_speak(self, trigger, message):
-        """что происходит когда Emiya говорит"""
+        """Handle an autonomous Emiya line."""
         print(f"\n{'═'*50}")
         print(f"  EMIYA  →  {message}")
         print(f"{'═'*50}\n")
-        # сюда потом добавим отправку в UI через WebSocket
+        # Later this can also be sent to the UI through WebSocket.
 
     def analyze_state(self):
         states   = set()
@@ -74,13 +74,13 @@ class Aggregator:
     def print_status(self, states, stats):
         apps = get_app_time(self.session_id, minutes=30)
         print("\n" + "─" * 50)
-        print(f"  время суток  : {stats['time_of_day']}")
-        print(f"  активно      : {stats['active_minutes']} мин")
-        print(f"  состояние    : {', '.join(states)}")
+        print(f"  time of day  : {stats['time_of_day']}")
+        print(f"  active       : {stats['active_minutes']} min")
+        print(f"  state        : {', '.join(states)}")
         if self.last_sys:
             print(f"  CPU          : {self.last_sys['cpu_percent']}%")
             print(f"  RAM          : {self.last_sys['ram_percent']}%")
-        print(f"  топ приложения:")
+        print("  top apps:")
         for a in apps[:3]:
             print(f"    {a['app']:25} {a['category']:10} {a['minutes']}m")
         print("─" * 50)
@@ -97,7 +97,7 @@ class Aggregator:
         t_window.start()
         t_system.start()
 
-        print("[Aggregator] запущен. Emiya наблюдает.")
+        print("[Aggregator] started. Emiya is watching.")
         print("─" * 50)
 
         try:
@@ -106,11 +106,11 @@ class Aggregator:
                 states = self.analyze_state()
                 stats  = self.session_tracker.get_stats()
 
-                # логируем состояние
+                # Log detected state.
                 for s in states:
                     log_state(s, self.session_id)
 
-                # проверяем триггеры
+                # Check triggers.
                 self.trigger_engine.check(states, stats)
 
                 self.print_status(states, stats)
@@ -124,7 +124,7 @@ class Aggregator:
         self.window_tracker.stop()
         self.system_tracker.stop()
         end_session(self.session_id)
-        print("\n[Aggregator] остановлен")
+        print("\n[Aggregator] stopped")
 
 if __name__ == "__main__":
     agg = Aggregator()

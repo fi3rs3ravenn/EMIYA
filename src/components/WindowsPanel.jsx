@@ -1,5 +1,5 @@
 /**
- * WindowsPanel — список активных окон + detected state.
+ * WindowsPanel - active windows plus detected state.
  *
  * Props:
  *   apps:    [{ app, type, minutes }]
@@ -35,7 +35,7 @@ export default function WindowsPanel({ apps, states, activeMinutes }) {
       <div className="panel__body">
         {list.length === 0 ? (
           <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8, textAlign: 'center' }}>
-            нет данных
+            no data
           </div>
         ) : (
           <div className="windows-list">

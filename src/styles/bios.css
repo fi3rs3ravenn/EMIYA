@@ -28,7 +28,7 @@
   --border:        #1a2422;
   --border-active: #3DDBB14D;
   --gap:           12px;
-  --radius:        2px;            /* минимум закругления, BIOS-style */
+  --radius:        2px;            /* minimal radius, BIOS-style */
 
   /* typography */
   --mono:          'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Code', 'Consolas', monospace;
@@ -202,7 +202,7 @@ body {
   overflow: hidden;
 }
 
-/* ─── PANEL (универсальный блок) ─────────────────────────────── */
+/* ─── PANEL (reusable block) ─────────────────────────────────── */
 .panel {
   border: 1px solid var(--border);
   background: var(--bg-panel);

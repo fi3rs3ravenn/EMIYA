@@ -14,7 +14,7 @@ def init_db():
     conn = get_connection()
     c = conn.cursor()
 
-    # сессии
+    # Sessions.
     c.execute('''
         CREATE TABLE IF NOT EXISTS sessions (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +24,7 @@ def init_db():
         )
     ''')
 
-    # лог окон
+    # Window log.
     c.execute('''
         CREATE TABLE IF NOT EXISTS window_log (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,7 +36,7 @@ def init_db():
         )
     ''')
 
-    # лог состояний
+    # State log.
     c.execute('''
         CREATE TABLE IF NOT EXISTS state_log (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ def init_db():
         )
     ''')
 
-    # лог триггеров Emiya
+    # Emiya trigger log.
     c.execute('''
         CREATE TABLE IF NOT EXISTS trigger_log (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +60,7 @@ def init_db():
         )
     ''')
 
-    # лог диалогов и сырых thinking-блоков моделей
+    # Dialogue log and raw model thinking blocks.
     c.execute('''
         CREATE TABLE IF NOT EXISTS chat_log (
             id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +87,7 @@ def init_db():
 
     conn.commit()
     conn.close()
-    print("[DB] инициализирована")
+    print("[DB] initialized")
 
 def start_session():
     conn = get_connection()
@@ -97,7 +97,7 @@ def start_session():
     session_id = c.lastrowid
     conn.commit()
     conn.close()
-    print(f"[DB] сессия #{session_id} начата")
+    print(f"[DB] session #{session_id} started")
     return session_id
 
 def end_session(session_id):
@@ -110,7 +110,7 @@ def end_session(session_id):
     )
     conn.commit()
     conn.close()
-    print(f"[DB] сессия #{session_id} завершена")
+    print(f"[DB] session #{session_id} ended")
 
 def log_window(app_name, category, session_id):
     conn = get_connection()
@@ -193,15 +193,15 @@ if __name__ == "__main__":
     sid = start_session()
     log_window("VS Code", "code", sid)
     log_state("deep_work", sid)
-    log_trigger("grinding", "три часа. что держит?", sid)
-    log_chat_message(sid, "user", "ты здесь?", "user", turn_id="demo")
+    log_trigger("grinding", "three hours. what is holding you here?", sid)
+    log_chat_message(sid, "user", "are you here?", "user", turn_id="demo")
     log_chat_message(
         sid,
         "assistant",
-        "здесь.",
+        "here.",
         "l1",
         turn_id="demo",
-        thought="короткий ответ лучше.",
+        thought="shorter is better.",
         model="qwen3:14b",
     )
-    print("[DB] тест прошёл успешно")
+    print("[DB] test passed")

@@ -1,15 +1,15 @@
 /**
- * AsciiArtZone — placeholder для будущего mood-зависимого ASCII.
+ * AsciiArtZone - placeholder for mood-driven ASCII.
  *
- * Сейчас рисует один из 6 базовых паттернов в зависимости от mood-зоны.
- * В будущем backend будет генерировать арт через L0 — заменишь на проп.
+ * Draws one of several base patterns from the current mood zone.
+ * Later the backend can generate art through L0 and pass it as a prop.
  *
  * Props:
  *   current: { energy, focus, openness }
  */
 
 const PATTERNS = {
-  /* low / low / low — упадок, разреженная сетка */
+  /* low / low / low - sparse decline */
   low_low_low: `
   ·   ·       ·
        ·          ·
@@ -19,7 +19,7 @@ const PATTERNS = {
        ·    ·
   ·                  ·`,
 
-  /* high / high / high — разгон, плотный паттерн */
+  /* high / high / high - dense acceleration */
   high_high_high: `
   ▓▒░ ░▒▓░▒░ ▓▒░░▓░
   ░▓▒░▓▒░▓▒░ ▓▒░▓▒░
@@ -29,7 +29,7 @@ const PATTERNS = {
   ░▓▒░▓░▒▓░▒ ▓▒░▓▒░
   ▓▒░▓▒░▓▒░▓ ▒░▓▒░▓`,
 
-  /* mid / mid / mid — нейтральный геометрический */
+  /* mid / mid / mid - neutral geometry */
   mid_mid_mid: `
   ┌─────────────┐
   │ · · · · · · │
@@ -41,7 +41,7 @@ const PATTERNS = {
   │ · · · · · · │
   └─────────────┘`,
 
-  /* low / high / low — холодная сосредоточенность */
+  /* low / high / low - cold focus */
   cold_focus: `
        │
        │
@@ -56,7 +56,7 @@ const PATTERNS = {
        │
        │`,
 
-  /* high / low / high — расхристанная */
+  /* high / low / high - scattered */
   scattered: `
   ▓ ░  ▒  ▓░  ▒
        ░▓ ░ ▒

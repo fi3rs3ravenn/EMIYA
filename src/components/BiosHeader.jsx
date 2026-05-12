@@ -1,6 +1,6 @@
 /**
- * BIOS-style верхний хедер.
- * Содержит: brand + версию системы + статус подключения + время + табы.
+ * BIOS-style top header.
+ * Contains brand, system version, connection status, time, and tabs.
  *
  * Props:
  *   tabs:        [{ id, label }]
@@ -8,7 +8,7 @@
  *   onTabChange: (id) => void
  *   connected:   bool
  *   sessionTime: string ("HH:MM:SS")
- *   uptime:      string (например "6.1m")
+ *   uptime:      string, for example "6.1m"
  */
 
 export default function BiosHeader({

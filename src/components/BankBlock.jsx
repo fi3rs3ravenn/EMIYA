@@ -1,5 +1,5 @@
 /**
- * BankBlock — переиспользуемый блок (как BANK 1 / BANK 2 на референсе).
+ * BankBlock - reusable block for BANK 1 / BANK 2 style panels.
  *
  * Props:
  *   title:  string

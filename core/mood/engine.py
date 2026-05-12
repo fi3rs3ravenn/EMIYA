@@ -6,12 +6,12 @@ from datetime import datetime
 from mood.lorenz import LorenzAttractor, MoodVector, PRESETS
 
 
-TRAIL_SIZE  = 500   # точки в ring buffer (для canvas)
-TICK_RATE   = 1.0   # секунд между шагами (1 Hz)
+TRAIL_SIZE  = 500   # points in the ring buffer for canvas
+TICK_RATE   = 1.0   # seconds between ticks (1 Hz)
 LOG_EVERY_TICKS = 30
 
-# сколько шагов аттрактора за один тик
-# больше → mood быстрее дрейфует
+# Number of attractor steps per tick.
+# Higher values make mood drift faster.
 STEPS_PER_TICK = 10
 
 
@@ -30,7 +30,7 @@ class EngineState:
     rho:      float
     beta:     float
     timestamp: str
-    trail:    list[dict]    # последние TRAIL_SIZE точек {x, y, z}
+    trail:    list[dict]    # latest TRAIL_SIZE points {x, y, z}
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -48,7 +48,7 @@ class MoodEngine:
         self._attractor = LorenzAttractor(sigma=sigma, rho=rho, beta=beta)
         self._current: MoodVector = self._attractor.current()
 
-        # ring buffer для trail
+        # Ring buffer for trail.
         self._trail: deque[dict] = deque(maxlen=TRAIL_SIZE)
 
         self._running = False
@@ -96,7 +96,7 @@ class MoodEngine:
         return True
     async def run(self) -> None:
         self._running = True
-        print(f"[MoodEngine] запущен - {STEPS_PER_TICK} шагов/тик - {TICK_RATE}s интервал")
+        print(f"[MoodEngine] started - {STEPS_PER_TICK} steps/tick - {TICK_RATE}s interval")
 
         while self._running:
             self._tick()
@@ -149,7 +149,7 @@ if __name__ == "__main__":
         engine = MoodEngine()
 
         print("=== MoodEngine demo ===\n")
-        print("запускаем run() как task, смотрим 5 тиков:\n")
+        print("starting run() as a task, watching 5 ticks:\n")
 
         task = asyncio.create_task(engine.run())
 
@@ -157,28 +157,28 @@ if __name__ == "__main__":
             await asyncio.sleep(1.1)
             mood = engine.get_current()
             state = engine.get_state()
-            print(f"тик {i+1}: {mood}")
+            print(f"tick {i+1}: {mood}")
             print(f"  trail size: {len(state.trail)}")
 
-        print("\nnudge('x', +3.0) — всплеск энергии:")
+        print("\nnudge('x', +3.0) - energy spike:")
         engine.nudge("x", 3.0)
         await asyncio.sleep(1.1)
-        print(f"  после nudge: {engine.get_current()}")
+        print(f"  after nudge: {engine.get_current()}")
 
-        print("\nпресет 'storm':")
+        print("\npreset 'storm':")
         engine.set_preset("storm")
         for i in range(3):
             await asyncio.sleep(1.1)
-            print(f"  тик {i+1}: {engine.get_current()}")
+            print(f"  tick {i+1}: {engine.get_current()}")
 
-        print("\nпресет 'calm':")
+        print("\npreset 'calm':")
         engine.set_preset("calm")
         for i in range(3):
             await asyncio.sleep(1.1)
-            print(f"  тик {i+1}: {engine.get_current()}")
+            print(f"  tick {i+1}: {engine.get_current()}")
 
         engine.stop()
         task.cancel()
-        print("\nдвижок остановлен.")
+        print("\nengine stopped.")
 
     asyncio.run(demo())

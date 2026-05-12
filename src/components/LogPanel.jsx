@@ -1,5 +1,5 @@
 /**
- * LogPanel — таб с логами: mood history, raw responses, debug events.
+ * LogPanel - logs tab: mood history, raw responses, debug events.
  *
  * Props:
  *   moodHistory:    [{ timestamp, energy, focus, openness }]
@@ -28,7 +28,7 @@ export default function LogPanel({ moodHistory, chatLog, triggerEvents }) {
       <div className="log-section">
         <div className="log-section__title">MOOD HISTORY · LAST 20</div>
         {(!moodHistory || moodHistory.length === 0) ? (
-          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>нет данных</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>no data</div>
         ) : (
           moodHistory.slice(-20).reverse().map((p, i) => (
             <div key={i} className="log-line">
@@ -45,7 +45,7 @@ export default function LogPanel({ moodHistory, chatLog, triggerEvents }) {
       <div className="log-section">
         <div className="log-section__title">CHAT LOG · LAST 30</div>
         {(!chatLog || chatLog.length === 0) ? (
-          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>нет сообщений</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>no messages</div>
         ) : (
           chatLog.slice(-30).reverse().map((m, i) => (
             <div key={i} className="log-line">
@@ -60,7 +60,7 @@ export default function LogPanel({ moodHistory, chatLog, triggerEvents }) {
       <div className="log-section">
         <div className="log-section__title">TRIGGER EVENTS · LAST 10</div>
         {(!triggerEvents || triggerEvents.length === 0) ? (
-          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>нет триггеров</div>
+          <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8 }}>no triggers</div>
         ) : (
           triggerEvents.slice(-10).reverse().map((t, i) => (
             <div key={i} className="log-line">

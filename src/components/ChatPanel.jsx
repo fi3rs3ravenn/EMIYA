@@ -1,6 +1,6 @@
 /**
- * ChatPanel — полноценный чат во всю основную зону.
- * Сохраняет всю текущую логику отправки/приёма сообщений.
+ * ChatPanel - full chat view for the main zone.
+ * Keeps the current send/receive message flow isolated.
  *
  * Props:
  *   messages:    [{ role, content, timestamp, model?, thought? }]
@@ -36,7 +36,7 @@ function ChatMessage({ msg }) {
       {msg.thought && (
         <div className="chat-thought" onClick={() => setThoughtOpen(!thoughtOpen)}>
           <span className="chat-thought__label">THOUGHT</span>
-          {thoughtOpen ? '▼ скрыть' : '▶ показать'}
+          {thoughtOpen ? 'v HIDE' : '> SHOW'}
           {thoughtOpen && (
             <div className="chat-thought__body">{msg.thought}</div>
           )}
@@ -86,7 +86,7 @@ export default function ChatPanel({ messages, onSend, isWaiting }) {
               <span>EMIYA</span>
               <span>...</span>
             </div>
-            <div className="chat-msg__body" style={{ opacity: 0.5 }}>обдумывает</div>
+            <div className="chat-msg__body" style={{ opacity: 0.5 }}>thinking</div>
           </div>
         )}
       </div>
@@ -97,7 +97,7 @@ export default function ChatPanel({ messages, onSend, isWaiting }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="написать emiya..."
+          placeholder="write to emiya..."
           disabled={isWaiting}
         />
         <button
@@ -105,7 +105,7 @@ export default function ChatPanel({ messages, onSend, isWaiting }) {
           onClick={handleSubmit}
           disabled={isWaiting || !input.trim()}
         >
-          →
+          {'>'}
         </button>
       </div>
     </div>

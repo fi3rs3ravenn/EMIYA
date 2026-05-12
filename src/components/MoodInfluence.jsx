@@ -1,6 +1,6 @@
 /**
- * MoodInfluence — список последних nudge событий.
- * Показывает что толкает её настроение из реального мира.
+ * MoodInfluence - recent nudge events.
+ * Shows what pushes her mood from the outside world.
  *
  * Props:
  *   events: [{ source, axis, delta, timestamp }]
@@ -30,7 +30,7 @@ export default function MoodInfluence({ events }) {
       <div className="panel__body">
         {list.length === 0 ? (
           <div style={{ color: 'var(--text-faint)', fontSize: 11, padding: 8, textAlign: 'center' }}>
-            нет событий
+            no events
           </div>
         ) : (
           <div className="influence-list">

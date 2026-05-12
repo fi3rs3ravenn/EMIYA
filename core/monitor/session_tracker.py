@@ -2,7 +2,7 @@ import time
 from datetime import datetime
 from monitor.db import get_connection, log_state
 
-AFK_THRESHOLD = 300  # 5 минут без активности = AFK
+AFK_THRESHOLD = 300  # 5 minutes without activity = AFK
 
 class SessionTracker:
     def __init__(self, session_id):
@@ -14,29 +14,29 @@ class SessionTracker:
         self.total_afk_seconds = 0
 
     def ping(self):
-        """вызывается когда есть активность (из WindowTracker)"""
+        """Called when activity is detected by WindowTracker."""
         now = datetime.now()
         if self.is_afk:
             afk_duration = (now - self.afk_start).seconds
             self.total_afk_seconds += afk_duration
             self.is_afk = False
             self.afk_start = None
-            print(f"[SessionTracker] вернулся после {afk_duration}s AFK")
+            print(f"[SessionTracker] returned after {afk_duration}s AFK")
         self.last_active = now
 
     def check_afk(self):
-        """проверяет не ушёл ли пользователь"""
+        """Check whether the user went AFK."""
         now = datetime.now()
         idle_seconds = (now - self.last_active).seconds
         if idle_seconds >= AFK_THRESHOLD and not self.is_afk:
             self.is_afk = True
             self.afk_start = now
-            print(f"[SessionTracker] AFK детектирован")
+            print("[SessionTracker] AFK detected")
             return True
         return False
 
     def get_active_duration(self):
-        """активное время сессии в минутах (без AFK)"""
+        """Active session time in minutes, excluding AFK."""
         total = (datetime.now() - self.session_start).seconds
         active = total - self.total_afk_seconds
         return round(active / 60, 1)
@@ -67,14 +67,14 @@ if __name__ == "__main__":
     sid = start_session()
     tracker = SessionTracker(session_id=sid)
 
-    print("симулируем сессию...")
+    print("simulating session...")
     print(f"[stats] {tracker.get_stats()}")
 
-    # симулируем активность
+    # Simulate activity.
     for i in range(3):
         tracker.ping()
         time.sleep(1)
 
     print(f"[stats] {tracker.get_stats()}")
     print(f"[time_of_day] {tracker.get_time_of_day()}")
-    print("[SessionTracker] тест прошёл")
+    print("[SessionTracker] test passed")

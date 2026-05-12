@@ -1,16 +1,14 @@
 /**
  * EMIYA root — BIOS-style frontend
  *
- * Архитектура:
- *   - WebSocket к ws://localhost:7474
- *   - таб-маршрутизация: MONITOR / CHAT / PATTERNS / LOG
- *   - правая колонка (side-zone) одинакова для MONITOR и CHAT — эта телеметрия
- *     должна быть всегда видна. для PATTERNS и LOG она тоже показывается,
- *     но её можно скрыть при желании в будущем.
+ * Architecture:
+ *   - WebSocket to ws://localhost:7474
+ *   - tab routing: MONITOR / CHAT / PATTERNS / LOG
+ *   - the right side-zone is shared by MONITOR and CHAT so telemetry stays visible.
  *
- * Компоненты в src/components/ — каждый изолирован, легко править отдельно.
+ * Components in src/components/ stay isolated and easy to change.
  *
- * Backend контракт (state_update packet):
+ * Backend contract (state_update packet):
  *   {
  *     mood:    { energy, focus, openness, raw_x, raw_y, raw_z },
  *     trail:   [...],
@@ -20,7 +18,7 @@
  *     apps:    [{ app, type, minutes }],
  *     states:  [string],
  *     active_minutes: number,
- *     influence: [{ source, axis, delta, timestamp }]   // опционально
+ *     influence: [{ source, axis, delta, timestamp }]   // optional
  *   }
  *
  *   chat_log packet:
@@ -240,7 +238,7 @@ export default function App() {
               message:   data.message,
             };
             setTriggerEvents((t) => [...t.slice(-50), ev]);
-            /* автономные L0-реплики тоже видны в чате */
+            /* Autonomous L0 lines also appear in chat. */
             setMessages((m) => [
               ...m,
               {
@@ -307,7 +305,7 @@ export default function App() {
   };
 
   /* ─── BANK content ─── */
-  /* BANK_1: что у emiya в голове сейчас — последние mood-фрагменты + последний trigger */
+  /* BANK_1: Emiya internal state: mood zones plus last trigger. */
   const lastTrigger = triggerEvents.length > 0 ? triggerEvents[triggerEvents.length - 1] : null;
   const moodComboLabel = (() => {
     if (!currentMood) return '—';
@@ -323,7 +321,7 @@ export default function App() {
       : { text: 'LAST   —', muted: true },
   ];
 
-  /* BANK_2: что снаружи у юзера — top apps + state */
+  /* BANK_2: user external context: top app plus detected state. */
   const topApp    = apps[0]?.app?.replace(/\.exe$/i, '') ?? '—';
   const topMin    = apps[0]?.minutes?.toFixed(1) ?? '0.0';
   const stateText = states && states.length > 0 ? states[0] : 'normal';
@@ -367,7 +365,7 @@ export default function App() {
 
   return (
     <div className="app-shell crt-flicker">
-      {/* фоновый logo */}
+      {/* background logo */}
       <div className="bg-logo">EMIYA</div>
 
       <BiosHeader

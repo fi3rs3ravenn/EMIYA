@@ -1,5 +1,5 @@
 /**
- * ModelsPanel — статусы L-meta / L0 / L1 / L2.
+ * ModelsPanel - L-meta / L0 / L1 / L2 statuses.
  *
  * Props:
  *   models: { 'L-meta': 'active', L0: 'active', L1: 'standby', L2: 'offline' }

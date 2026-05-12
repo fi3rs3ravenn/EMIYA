@@ -1,6 +1,6 @@
 /**
- * ParamsReadout — read-only отображение sigma/rho/beta аттрактора.
- * Заменяет MoodTuner — пользователь не управляет настроением вручную.
+ * ParamsReadout - read-only sigma/rho/beta attractor display.
+ * Replaces MoodTuner: user does not steer mood manually here.
  *
  * Props:
  *   params: { sigma, rho, beta }

@@ -5,7 +5,7 @@ import psutil
 from datetime import datetime
 from monitor.db import log_window, get_connection
 
-# категории приложений
+# Application categories.
 APP_CATEGORIES = {
     # code
     "code.exe": "code", "cursor.exe": "code", "pycharm64.exe": "code",
@@ -29,7 +29,7 @@ APP_CATEGORIES = {
 }
 
 def get_active_window():
-    """возвращает (название окна, exe процесса)"""
+    """Return the active window title and process executable."""
     try:
         hwnd = win32gui.GetForegroundWindow()
         title = win32gui.GetWindowText(hwnd)
@@ -41,14 +41,14 @@ def get_active_window():
         return None, None
 
 def categorize(exe):
-    """определяет категорию по имени exe"""
+    """Resolve an app category from an executable name."""
     if exe in APP_CATEGORIES:
         return APP_CATEGORIES[exe]
-    # если не знаем — смотрим на GPU нагрузку (заглушка пока)
+    # GPU-based detection can be added later for unknown apps.
     return "other"
 
 def get_app_time(session_id, minutes=30):
-    """возвращает сколько минут провёл в каждом приложении за последние N минут"""
+    """Return minutes spent in each app during the last N minutes."""
     conn = get_connection()
     c = conn.cursor()
     c.execute('''
@@ -61,12 +61,12 @@ def get_app_time(session_id, minutes=30):
     ''', (session_id, -minutes))
     rows = c.fetchall()
     conn.close()
-    # каждый тик = 5 секунд
+    # Each tick is 5 seconds.
     return [{"app": r["app_name"], "category": r["category"],
              "minutes": round(r["ticks"] * 5 / 60, 1)} for r in rows]
 
 def get_switch_count(session_id, minutes=10):
-    """считает переключения между окнами за последние N минут"""
+    """Count window switches during the last N minutes."""
     conn = get_connection()
     c = conn.cursor()
     c.execute('''
@@ -85,13 +85,13 @@ def get_switch_count(session_id, minutes=10):
 class WindowTracker:
     def __init__(self, session_id, interval=5):
         self.session_id = session_id
-        self.interval = interval  # секунд
+        self.interval = interval  # seconds
         self.running = False
         self.last_exe = None
 
     def start(self):
         self.running = True
-        print("[WindowTracker] запущен")
+        print("[WindowTracker] started")
         while self.running:
             title, exe = get_active_window()
             if exe:
@@ -104,7 +104,7 @@ class WindowTracker:
 
     def stop(self):
         self.running = False
-        print("[WindowTracker] остановлен")
+        print("[WindowTracker] stopped")
 
 if __name__ == "__main__":
     from db import init_db, start_session
@@ -112,16 +112,16 @@ if __name__ == "__main__":
     sid = start_session()
     
     tracker = WindowTracker(session_id=sid, interval=5)
-    print("отслеживаем активное окно (Ctrl+C для остановки)...")
+    print("tracking active window (Ctrl+C to stop)...")
     try:
         tracker.start()
     except KeyboardInterrupt:
         tracker.stop()
         
         apps = get_app_time(sid)
-        print("\n── статистика ──")
+        print("\n-- stats --")
         for a in apps:
             print(f"  {a['app']:30} {a['category']:10} {a['minutes']}m")
         
         switches = get_switch_count(sid)
-        print(f"\nпереключений за 10 мин: {switches}")
+        print(f"\nwindow switches in 10 min: {switches}")

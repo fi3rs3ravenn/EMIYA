@@ -13,7 +13,7 @@ class MoodVector:
     energy:   float   # [0, 1]
     focus:    float   # [0, 1]
     openness: float   # [0, 1]
-    raw_x:    float   # сырые координаты аттрактора
+    raw_x:    float   # raw attractor coordinates
     raw_y:    float
     raw_z:    float
 
@@ -56,8 +56,8 @@ class LorenzAttractor:
 
     def step(self, dt: float | None = None) -> MoodVector:
         """
-        Один шаг интегрирования RK4.
-        Возвращает MoodVector с нормализованными [0,1] значениями.
+        One RK4 integration step.
+        Returns a MoodVector with normalized [0, 1] values.
         """
         h = dt if dt is not None else self.dt
         x, y, z = self.x, self.y, self.z
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
     att = LorenzAttractor()
 
-    print("прогон 20 шагов:")
+    print("running 20 steps:")
     for i in range(20):
         mood = att.step()
         print(f"  step {i+1:02d}: {mood}")
@@ -162,13 +162,13 @@ if __name__ == "__main__":
         mood = att.step()
         print(f"  step {i+1:02d}: {mood}")
 
-    print("\nсмена на пресет 'storm':")
+    print("\nswitching to preset 'storm':")
     att.set_params(**PRESETS["storm"])
     for i in range(5):
         mood = att.step()
         print(f"  step {i+1:02d}: {mood}")
 
-    print("\nдетерминизм — два аттрактора с одним seed должны давать одинаковый результат:")
+    print("\ndeterminism: two attractors with the same seed should match:")
     a1 = LorenzAttractor(x0=1.0, y0=0.5, z0=0.5)
     a2 = LorenzAttractor(x0=1.0, y0=0.5, z0=0.5)
     for _ in range(50):
@@ -178,4 +178,4 @@ if __name__ == "__main__":
     print(f"  a1: {m1}")
     print(f"  a2: {m2}")
     match = abs(m1.energy - m2.energy) < 1e-9
-    print(f"  детерминизм: {'✓' if match else '✗ ОШИБКА'}")
+    print(f"  deterministic: {'OK' if match else 'ERROR'}")
