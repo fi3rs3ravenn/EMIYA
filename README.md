@@ -226,6 +226,13 @@ cp config/example.json config/emiya.json
 npm run emiya
 ```
 
+For model testing without writing new conversation memory:
+
+```bash
+$env:EMIYA_MEMORY_WRITES="0"
+python core/server.py
+```
+
 Full setup guide: [`docs/SETUP.md`](./docs/SETUP.md) *(coming in sprint 5)*
 
 ---

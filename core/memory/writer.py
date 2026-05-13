@@ -4,8 +4,9 @@ from .store import MemoryStore
 
 
 class MemoryWriter:
-    def __init__(self, store: MemoryStore | None = None):
+    def __init__(self, store: MemoryStore | None = None, enabled: bool = True):
         self.store = store or MemoryStore()
+        self.enabled = bool(enabled)
 
     def write_conversation(
         self,
@@ -14,7 +15,9 @@ class MemoryWriter:
         mood_snapshot: dict[str, Any] | None = None,
         importance: float = 0.5,
         tags: list[str] | None = None,
-    ) -> int:
+    ) -> int | None:
+        if not self.enabled:
+            return None
         content = f"user: {user_text.strip()}\nemiya: {assistant_text.strip()}"
         return self.store.add(
             "conversation",
@@ -30,7 +33,9 @@ class MemoryWriter:
         mood_snapshot: dict[str, Any] | None = None,
         importance: float = 0.35,
         tags: list[str] | None = None,
-    ) -> int:
+    ) -> int | None:
+        if not self.enabled:
+            return None
         return self.store.add(
             "observation",
             content,
@@ -45,7 +50,9 @@ class MemoryWriter:
         message: str,
         mood_snapshot: dict[str, Any] | None = None,
         importance: float = 0.6,
-    ) -> int:
+    ) -> int | None:
+        if not self.enabled:
+            return None
         content = f"trigger: {trigger.strip()}\nemiya: {message.strip()}"
         return self.store.add(
             "trigger_event",

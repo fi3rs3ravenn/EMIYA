@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import sys
 import threading
 import time
@@ -40,6 +41,15 @@ STATE_NUDGES = {
     "gaming": ("x", +1.0),
 }
 
+FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+
+
+def env_flag(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in FALSE_ENV_VALUES
+
 
 def configure_output_encoding():
     for stream in (sys.stdout, sys.stderr):
@@ -62,7 +72,8 @@ class EmiyaServer:
         self.mood_engine = MoodEngine()
         self.memory_store = MemoryStore()
         self.memory_store.init_schema()
-        self.memory_writer = MemoryWriter(self.memory_store)
+        self.memory_writes_enabled = env_flag("EMIYA_MEMORY_WRITES", default=True)
+        self.memory_writer = MemoryWriter(self.memory_store, enabled=self.memory_writes_enabled)
         self.memory_retriever = MemoryRetriever(self.memory_store)
         self.traits = load_traits()
         self.last_sys = {}
@@ -323,6 +334,7 @@ class EmiyaServer:
             "sys": sys_state,
             "params": params,
             "models": {"L-meta": "active", "L0": "active", "L1": "standby", "L2": "offline"},
+            "memory": {"writes_enabled": self.memory_writes_enabled},
             "emiya": self.pending_message,
             "traits": self.traits.to_dict(),
             "pipeline": pipeline_logger.recent(20, compact=True),
@@ -462,6 +474,8 @@ class EmiyaServer:
         self.run_trackers()
         asyncio.create_task(self.mood_engine.run())
         print("[Mood] engine started")
+        if not self.memory_writes_enabled:
+            print("[Memory] writes disabled by EMIYA_MEMORY_WRITES=0")
 
         print(f"[EMIYA] server -> ws://{HOST}:{PORT}")
         async with websockets.serve(self.handler, HOST, PORT):

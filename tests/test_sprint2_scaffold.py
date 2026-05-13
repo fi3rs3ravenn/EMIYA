@@ -10,6 +10,7 @@ sys.path.insert(0, str(ROOT / "core"))
 from memory.retriever import build_memory_prompt_blocks
 from memory.retriever import filter_prompt_safe_memories
 from memory.store import MemoryStore
+from memory.writer import MemoryWriter
 from personality.modifiers import traits_to_prompt_fragment
 from personality.traits import PersonalityTraits, apply_preset, load_traits, save_traits
 from telemetry.pipeline_log import PipelineLogger
@@ -39,6 +40,20 @@ class Sprint2ScaffoldTests(unittest.TestCase):
             self.assertEqual(recent[0].id, first_id)
             self.assertEqual(search[0].content, "user: python\nemiya: rust.")
             self.assertEqual(len(same_mood), 2)
+
+    def test_memory_writer_can_disable_writes_for_model_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = MemoryStore(str(Path(tmp) / "memory.db"))
+            writer = MemoryWriter(store, enabled=False)
+
+            memory_id = writer.write_conversation(
+                "who are you?",
+                "bad test output should not persist.",
+                mood_snapshot={"energy": 0.5, "focus": 0.5, "openness": 0.5},
+            )
+
+            self.assertIsNone(memory_id)
+            self.assertEqual(store.get_recent(10), [])
 
     def test_memory_prompt_blocks_are_xml_shaped(self):
         block = build_memory_prompt_blocks(
