@@ -16,6 +16,8 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 .idea
+# Local Claude project-state checks and task planning notes
+.claude/
 .DS_Store
 *.suo
 *.ntvs*
