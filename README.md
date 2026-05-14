@@ -17,7 +17,7 @@
 
 **[ status: EARLY DEVELOPMENT · R&D PHASE ]**
 
-`v0.1-sprint1` · last boot: configure in config
+`v0.1-sprint1.5` · Sprint 2 active
 
 ![python](https://img.shields.io/badge/python-3.11+-ffb000?style=flat-square&labelColor=000000)
 ![react](https://img.shields.io/badge/react-18-ffb000?style=flat-square&labelColor=000000)
@@ -56,10 +56,10 @@ She will not close your tabs for you. She might ask why you have forty of them o
   │   always alive · routes requests   ~500MB RAM         │
   ├────────────────────┬───────────────────────────────────┤
   │   L0               │   L1                              │
-  │   Qwen3 4B         │   Qwen3 14B (thinking)            │
+  │   Qwen3 4B         │   L3-8B-Stheno v3.2 Q5_K_M        │
   │   always loaded    │   on-demand                       │
   │   observation      │   deep dialogue                   │
-  │   small talk       │   emotional range                 │
+  │   small talk       │   persona voice                   │
   │   long sessions    │   code direction                  │
   ├────────────────────┴───────────────────────────────────┤
   │   L2   Claude API (external)                           │
@@ -73,7 +73,7 @@ She will not close your tabs for you. She might ask why you have forty of them o
   │                                                        │
   │   • Activity Monitor      watches your patterns        │
   │   • Lorenz Mood Engine    3-axis chaotic drift         │
-  │   • Persona Validator     Qwen3 1.7B character guard   │
+  │   • Persona Validator     planned character guard      │
   │   • Memory Store          SQLite, mood-tagged          │
   │   • Trigger Engine        user-defined DSL rules       │
   │   • Pipeline Telemetry    every step visible           │
@@ -118,9 +118,9 @@ The full 12-week build plan lives in [`SPRINT_ROADMAP.md`](./SPRINT_ROADMAP.md).
 
 | Sprint | Goal | Status |
 |:------:|:-----|:------:|
-| **01** | Lorenz Mood Engine · live visualization · mood → prompt pipeline | `[ in progress ]` |
-| **02** | Persistent memory · personality knobs · response pipeline visualizer | `[ queued ]` |
-| **03** | Qwen3 migration · persona validator · model console · decoding panel | `[ queued ]` |
+| **01** | Lorenz Mood Engine · live visualization · mood → prompt pipeline | `[ tagged: v0.1-sprint1.5 ]` |
+| **02** | Persistent memory · personality knobs · response pipeline visualizer | `[ active ]` |
+| **03** | Persona validator · model console · decoding panel | `[ queued ]` |
 | **04** | ClawBridge · OpenClaw integration · task delegation · result narration | `[ queued ]` |
 | **05** | Trigger DSL · memory inspector · UI polish · v0.1 release | `[ queued ]` |
 | **06** | Custom skills · community feedback · retrospective | `[ optional ]` |
@@ -201,14 +201,14 @@ L2 (Claude API) runs in the cloud — only an Anthropic API key is required, no 
 
 ```bash
 # 01. clone
-git clone git clone https://github.com/naevor/EMIYA.git
+git clone https://github.com/naevor/EMIYA.git
 cd EMIYA
 
 # 02. install Ollama and pull required models
-ollama pull qwen3:0.6b
-ollama pull qwen3:1.7b
 ollama pull qwen3:4b
-ollama pull qwen3:14b
+ollama pull hf.co/bartowski/L3-8B-Stheno-v3.2-GGUF:Q5_K_M
+
+# later sprint validator/model-console work may add more local models
 
 # 03. python backend
 cd core
@@ -264,7 +264,8 @@ Built on the shoulders of:
 
 - **[MHRD](https://store.steampowered.com/app/576030/MHRD/)** — for proving that letting users see the circuits is more engaging than hiding them
 - **[Ollama](https://ollama.com)** — for making local LLMs trivial
-- **[Qwen team](https://qwenlm.github.io/)** — for Qwen3 and interleaved thinking
+- **[Qwen team](https://qwenlm.github.io/)** — for Qwen3, currently used by L0
+- **L3-8B-Stheno v3.2 GGUF** — current L1 voice model
 - **[OpenClaw](https://openclaw.ai)** — for the "hands" infrastructure
 - **[Anthropic](https://anthropic.com)** — for Claude (L2) and for conversations that helped shape this project
 - **Lorenz** — for the attractor
