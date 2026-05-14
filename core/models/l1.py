@@ -43,7 +43,6 @@ def _build_runtime_context(context: dict | None) -> str:
     active_min = context.get("active_min", 0)
     is_afk = context.get("is_afk", False)
     states = context.get("states", [])
-    mood = context.get("mood", {})
     time_of_day = context.get("time_of_day", "unknown")
     cpu = context.get("cpu", 0)
     ram = context.get("ram", 0)
@@ -66,12 +65,6 @@ def _build_runtime_context(context: dict | None) -> str:
     <cpu>{_safe_xml_text(cpu)}</cpu>
     <ram>{_safe_xml_text(ram)}</ram>
   </system_load>
-
-  <mood_values>
-    <energy>{_safe_xml_text(mood.get("energy", 0.5))}</energy>
-    <focus>{_safe_xml_text(mood.get("focus", 0.5))}</focus>
-    <openness>{_safe_xml_text(mood.get("openness", 0.5))}</openness>
-  </mood_values>
 </runtime_context>
 """.strip()
 

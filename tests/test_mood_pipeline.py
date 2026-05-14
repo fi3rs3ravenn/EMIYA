@@ -97,6 +97,21 @@ class MoodPipelineTests(unittest.TestCase):
         )
         self.assertNotEqual(payloads[0]["options"]["seed"], payloads[1]["options"]["seed"])
 
+    def test_l1_runtime_context_does_not_duplicate_raw_mood_values(self):
+        context = {
+            "active_min": 10,
+            "apps": [{"app": "code.exe"}],
+            "states": ["normal"],
+            "mood": {"energy": 0.34, "focus": 0.81, "openness": 0.22},
+        }
+
+        runtime = l1._build_runtime_context(context)
+        system = l1._build_system(context)
+
+        self.assertNotIn("<mood_values>", runtime)
+        self.assertNotIn("<energy>0.34</energy>", runtime)
+        self.assertIn("energy: 0.34", system)
+
     def test_l1_clean_strips_chat_template_tokens(self):
         self.assertEqual(l1._clean("neutral. observing. <|im_end|> trailing"), "neutral. observing.")
         self.assertEqual(l1._clean("i'm here.<|eot_id|>"), "i'm here.")
