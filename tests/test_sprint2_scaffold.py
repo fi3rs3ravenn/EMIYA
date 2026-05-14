@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "core"))
 
 from memory.retriever import build_memory_prompt_blocks
 from memory.retriever import filter_prompt_safe_memories
+from memory.retriever import is_prompt_safe_memory
 from memory.store import MemoryStore
 from memory.writer import MemoryWriter
 from personality.modifiers import traits_to_prompt_fragment
@@ -92,6 +93,7 @@ class Sprint2ScaffoldTests(unittest.TestCase):
                 "timestamp": "now",
                 "type": "conversation",
                 "content": "user: rust?\nemiya: rust. boring answer, correct one.",
+                "importance": 0.5,
             },
         ]
 
@@ -104,6 +106,31 @@ class Sprint2ScaffoldTests(unittest.TestCase):
         self.assertNotIn("next question", block)
         self.assertNotIn("def emiya", block)
         self.assertNotIn("state detected", block)
+
+    def test_memory_filter_uses_assistant_side_and_importance_floor(self):
+        user_side_entity = {
+            "timestamp": "now",
+            "type": "conversation",
+            "content": "user: are you a digital entity?\nemiya: no.",
+            "importance": 0.5,
+        }
+        assistant_side_entity = {
+            "timestamp": "now",
+            "type": "conversation",
+            "content": "user: are you emiya?\nemiya: i am a digital entity.",
+            "importance": 0.5,
+        }
+        low_importance = {
+            "timestamp": "now",
+            "type": "conversation",
+            "content": "user: ok\nemiya: clean but not useful.",
+            "importance": 0.1,
+        }
+
+        self.assertTrue(is_prompt_safe_memory(user_side_entity))
+        self.assertFalse(is_prompt_safe_memory(assistant_side_entity))
+        self.assertFalse(is_prompt_safe_memory(low_importance))
+        self.assertTrue(is_prompt_safe_memory(low_importance, importance_floor=0.0))
 
     def test_traits_round_trip_and_prompt_fragment(self):
         with tempfile.TemporaryDirectory() as tmp:
