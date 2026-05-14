@@ -16,10 +16,10 @@ _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
 STOP_TOKENS = GENERATION_STOP_MARKERS
 BASE_OPTIONS = {
-    "temperature": 0.72,
+    "temperature": 0.85,
     "top_p": 0.9,
     "top_k": 40,
-    "repeat_penalty": 1.12,
+    "repeat_penalty": 1.05,
     "num_predict": 900,
     "num_ctx": 4096,
     "stop": list(STOP_TOKENS),
