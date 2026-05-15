@@ -42,7 +42,7 @@ def _build_runtime_context(context: dict | None) -> str:
     apps = context.get("apps", [])
     active_min = context.get("active_min", 0)
     is_afk = context.get("is_afk", False)
-    states = context.get("states", [])
+    activity_hints = context.get("activity_hints") or ["nothing unusual in the activity pattern."]
     time_of_day = context.get("time_of_day", "unknown")
     cpu = context.get("cpu", 0)
     ram = context.get("ram", 0)
@@ -58,7 +58,9 @@ def _build_runtime_context(context: dict | None) -> str:
     <active_minutes>{int(active_min)}</active_minutes>
     <is_afk>{str(bool(is_afk)).lower()}</is_afk>
     <active_app>{_safe_xml_text(top_app)}</active_app>
-    <states>{_safe_xml_text(", ".join(states) if states else "normal")}</states>
+    <activity_hints>
+{_format_activity_hints(activity_hints)}
+    </activity_hints>
   </activity>
 
   <system_load>
@@ -67,6 +69,14 @@ def _build_runtime_context(context: dict | None) -> str:
   </system_load>
 </runtime_context>
 """.strip()
+
+
+def _format_activity_hints(activity_hints: list[str]) -> str:
+    return "\n".join(
+        f"      <hint>{_safe_xml_text(hint)}</hint>"
+        for hint in activity_hints
+        if str(hint).strip()
+    ) or "      <hint>nothing unusual in the activity pattern.</hint>"
 
 
 def _build_system(context: dict | None) -> str:

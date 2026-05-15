@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "core"))
 
 from models import l0, l1
+from monitor.state_modifiers import states_to_activity_hints
 from mood.engine import MoodEngine
 from mood.modifiers import mood_from_mapping, mood_seed, mood_to_model_options
 
@@ -101,7 +102,7 @@ class MoodPipelineTests(unittest.TestCase):
         context = {
             "active_min": 10,
             "apps": [{"app": "code.exe"}],
-            "states": ["normal"],
+            "activity_hints": states_to_activity_hints(["normal"]),
             "mood": {"energy": 0.34, "focus": 0.81, "openness": 0.22},
         }
 
@@ -111,6 +112,32 @@ class MoodPipelineTests(unittest.TestCase):
         self.assertNotIn("<mood_values>", runtime)
         self.assertNotIn("<energy>0.34</energy>", runtime)
         self.assertIn("energy: 0.34", system)
+
+    def test_l1_runtime_context_uses_activity_hints_instead_of_state_labels(self):
+        context = {
+            "active_min": 10,
+            "apps": [{"app": "code.exe"}],
+            "states": ["scattered", "idle_loop"],
+            "activity_hints": states_to_activity_hints(["scattered", "idle_loop"]),
+            "mood": {"energy": 0.5, "focus": 0.5, "openness": 0.5},
+        }
+
+        runtime = l1._build_runtime_context(context)
+
+        self.assertIn("<activity_hints>", runtime)
+        self.assertIn("he keeps switching windows", runtime)
+        self.assertIn("he keeps circling the same windows", runtime)
+        self.assertNotIn("<states>", runtime)
+        self.assertNotIn("scattered", runtime)
+        self.assertNotIn("idle_loop", runtime)
+
+    def test_activity_hints_do_not_echo_monitor_state_labels(self):
+        hints = states_to_activity_hints(["scattered", "grinding", "idle_loop", "normal"])
+        joined = " ".join(hints)
+
+        self.assertIn("switching windows", joined)
+        for raw_label in ("scattered", "grinding", "idle_loop", "normal"):
+            self.assertNotIn(raw_label, joined)
 
     def test_l1_clean_strips_chat_template_tokens(self):
         self.assertEqual(l1._clean("neutral. observing. <|im_end|> trailing"), "neutral. observing.")

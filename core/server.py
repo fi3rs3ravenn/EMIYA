@@ -14,6 +14,7 @@ from memory.store import MemoryStore
 from memory.writer import MemoryWriter
 from monitor.db import init_db, log_chat_message, log_state, start_session
 from monitor.session_tracker import SessionTracker
+from monitor.state_modifiers import states_to_activity_hints
 from monitor.system_tracker import SystemTracker
 from monitor.trigger_engine import TriggerEngine
 from monitor.window_tracker import WindowTracker, get_app_time, get_switch_count
@@ -271,6 +272,7 @@ class EmiyaServer:
             "active_min": stats["active_minutes"],
             "is_afk": stats["is_afk"],
             "states": list(states),
+            "activity_hints": states_to_activity_hints(states),
             "apps": apps[:5],
             "cpu": self.last_sys.get("cpu_percent", 0),
             "ram": self.last_sys.get("ram_percent", 0),
