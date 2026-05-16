@@ -798,17 +798,27 @@ body {
 
 .trait-preset {
   min-height: 24px;
-  border: 1px solid var(--border-active);
+  padding: 4px 6px;
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--mint);
+  color: var(--text-faint);
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 
 .trait-preset:hover {
+  color: var(--mint);
+  border-color: var(--border-active);
+  background: var(--mint-dim);
+}
+
+.trait-preset--active {
+  color: var(--mint);
+  border-color: var(--border-active);
   background: var(--mint-dim);
 }
 
@@ -840,8 +850,62 @@ body {
 }
 
 .trait-row__slider {
+  -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  accent-color: var(--mint);
+  height: 3px;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  border-radius: 0;
+  margin: 4px 0;
+  /* fill gradient set via inline style in JSX */
+}
+
+.trait-row__slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.trait-row__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 7px;
+  height: 16px;
+  margin-top: -7px;
+  background: var(--mint);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--mint-glow);
+  transition: box-shadow 0.15s;
+}
+
+.trait-row__slider:hover::-webkit-slider-thumb {
+  box-shadow: 0 0 14px var(--mint);
+}
+
+.trait-row__slider::-moz-range-track {
+  height: 3px;
+  background: var(--border);
+  border: none;
+  border-radius: 0;
+}
+
+.trait-row__slider::-moz-range-progress {
+  height: 3px;
+  background: var(--mint);
+  border-radius: 0;
+}
+
+.trait-row__slider::-moz-range-thumb {
+  width: 7px;
+  height: 16px;
+  background: var(--mint);
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--mint-glow);
 }
 
 .trait-row__hint {

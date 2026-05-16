@@ -1,8 +1,10 @@
+import { useState } from 'react';
+
 const TRAITS = [
   { key: 'curiosity', label: 'CURIOSITY' },
   { key: 'bluntness', label: 'BLUNTNESS' },
-  { key: 'warmth', label: 'WARMTH' },
-  { key: 'sarcasm', label: 'SARCASM' },
+  { key: 'warmth',    label: 'WARMTH'    },
+  { key: 'sarcasm',   label: 'SARCASM'   },
   { key: 'formality', label: 'FORMALITY' },
 ];
 
@@ -34,20 +36,27 @@ function describeTrait(key, value) {
   return 'controlled';
 }
 
+const sliderTrack = (value) =>
+  `linear-gradient(to right, var(--mint) ${value}%, var(--border) ${value}%)`;
+
 export default function PersonalityPanel({ traits, onChange, onPreset }) {
+  const [activePreset, setActivePreset] = useState(null);
   const current = traits ?? {};
 
   const updateTrait = (key, value) => {
+    setActivePreset(null);
     onChange?.({ ...current, [key]: Number(value) });
+  };
+
+  const handlePreset = (preset) => {
+    setActivePreset(preset);
+    onPreset?.(preset);
   };
 
   return (
     <div className="panel">
       <div className="panel__header">
         <span>PERSONALITY</span>
-        <span style={{ color: 'var(--text-faint)', fontSize: 9, letterSpacing: '0.2em' }}>
-          SPRINT 2
-        </span>
       </div>
       <div className="panel__body">
         <div className="trait-presets">
@@ -55,13 +64,15 @@ export default function PersonalityPanel({ traits, onChange, onPreset }) {
             <button
               key={preset}
               type="button"
-              className="trait-preset"
-              onClick={() => onPreset?.(preset)}
+              className={`trait-preset${activePreset === preset ? ' trait-preset--active' : ''}`}
+              onClick={() => handlePreset(preset)}
             >
               {preset}
             </button>
           ))}
         </div>
+
+        <div className="divider" />
 
         <div className="trait-list">
           {TRAITS.map(({ key, label }) => {
@@ -78,7 +89,8 @@ export default function PersonalityPanel({ traits, onChange, onPreset }) {
                   min="0"
                   max="100"
                   value={value}
-                  onChange={(event) => updateTrait(key, event.target.value)}
+                  style={{ background: sliderTrack(value) }}
+                  onChange={(e) => updateTrait(key, e.target.value)}
                 />
                 <span className="trait-row__hint">{describeTrait(key, value)}</span>
               </label>
