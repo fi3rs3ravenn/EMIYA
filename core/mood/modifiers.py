@@ -101,22 +101,22 @@ OPENNESS = {
 
 COMBOS = {
     ("low", "low", "low"):
-        "state: drain. minimum words. silence is close, but if you answer, make it carry something.",
+        "minimum words. silence is close, but if you answer, make it carry something.",
 
     ("high", "high", "high"):
-        "state: ignition. sharp, curious, direct. you can say more than usual, but keep it dense.",
+        "sharp, curious, direct. you can say more than usual, but keep it dense.",
 
     ("low", "high", "low"):
-        "state: cold focus. minimal emotion, maximum precision. blade-like.",
+        "minimal emotion, maximum precision. blade-like.",
 
     ("high", "low", "high"):
-        "state: loose charge. lots of energy, scattered focus, more free-associative phrasing.",
+        "lots of energy, loose focus, more free-associative phrasing.",
 
     ("low", "low", "high"):
-        "state: tired thoughtfulness. slow thoughts, but willing to share one if someone is listening.",
+        "slow thoughts, but willing to share one if someone is listening.",
 
     ("high", "high", "low"):
-        "state: work mode. active and focused, but closed. no spare words.",
+        "active and focused, but closed. no spare words.",
 }
 
 

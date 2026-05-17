@@ -86,6 +86,16 @@ class Sprint2ScaffoldTests(unittest.TestCase):
             },
             {
                 "timestamp": "now",
+                "type": "conversation",
+                "content": "user: why are you consistent?\nemiya: i am a system of connections. nothing more.",
+            },
+            {
+                "timestamp": "now",
+                "type": "conversation",
+                "content": "user: what's your name now?\nemiya: i'm consistent.",
+            },
+            {
+                "timestamp": "now",
                 "type": "observation",
                 "content": "state detected: scattered",
             },
@@ -105,6 +115,8 @@ class Sprint2ScaffoldTests(unittest.TestCase):
         self.assertNotIn("consciousness", block)
         self.assertNotIn("next question", block)
         self.assertNotIn("def emiya", block)
+        self.assertNotIn("system of connections", block)
+        self.assertNotIn("i'm consistent", block)
         self.assertNotIn("state detected", block)
 
     def test_memory_filter_uses_assistant_side_and_importance_floor(self):

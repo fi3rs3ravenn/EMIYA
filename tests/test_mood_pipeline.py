@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "core"))
 from models import l0, l1
 from monitor.state_modifiers import states_to_activity_hints
 from mood.engine import MoodEngine
-from mood.modifiers import mood_from_mapping, mood_seed, mood_to_model_options
+from mood.modifiers import mood_from_mapping, mood_seed, mood_to_model_options, mood_to_prompt_fragment
 
 
 class FakeResponse:
@@ -36,6 +36,14 @@ class MoodPipelineTests(unittest.TestCase):
         self.assertEqual(options["temperature"], 0.8)
         self.assertEqual(options["num_predict"], 100)
         self.assertEqual(options["seed"], mood_seed(mood))
+
+    def test_mood_prompt_does_not_echo_forbidden_state_language(self):
+        mood = mood_from_mapping({"energy": 0.9, "focus": 0.1, "openness": 0.9})
+        fragment = mood_to_prompt_fragment(mood)
+
+        self.assertIn("loose focus", fragment)
+        self.assertNotIn("scattered", fragment)
+        self.assertNotIn("state:", fragment)
 
     def test_l0_prompt_and_request_options_are_regenerated_from_current_mood(self):
         low_mood = {"energy": 0.2, "focus": 0.8, "openness": 0.1}
