@@ -10,7 +10,8 @@ from models.response_utils import (
 )
 
 
-MODEL = "hf.co/bartowski/L3-8B-Stheno-v3.2-GGUF:Q5_K_M"
+# MODEL = "hf.co/bartowski/L3-8B-Stheno-v3.2-GGUF:Q5_K_M"
+MODEL = "gemma4:e4b"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
