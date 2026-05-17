@@ -147,6 +147,15 @@ body {
 .status-dot.standby {
   background: var(--warn);
 }
+.status-dot.awaiting {
+  background: var(--mint);
+  opacity: 0.35;
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.7;  }
+}
 .status-dot.dim {
   background: var(--dim);
 }

@@ -120,6 +120,10 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
 
+  /* ─── L1 activity tracking ─── */
+  const [l1Status,  setL1Status]  = useState('awaiting');
+  const l1TimerRef = useRef(null);
+
   /* ─── live state ─── */
   const [trail,         setTrail]         = useState([]);
   const [currentMood,   setCurrentMood]   = useState(null);
@@ -219,6 +223,9 @@ export default function App() {
 
           if (data.type === 'emiya_reply') {
             setIsWaiting(false);
+            clearTimeout(l1TimerRef.current);
+            setL1Status('active');
+            l1TimerRef.current = setTimeout(() => setL1Status('awaiting'), 5 * 60 * 1000);
             setMessages((m) => [
               ...m,
               {
@@ -290,6 +297,8 @@ export default function App() {
       { role: 'user', content: text, timestamp: new Date().toISOString() },
     ]);
     setIsWaiting(true);
+    clearTimeout(l1TimerRef.current);
+    setL1Status('active');
     wsRef.current.send(JSON.stringify({ type: 'user_message', text }));
   };
 
@@ -396,7 +405,7 @@ export default function App() {
             onChange={handleTraitsChange}
             onPreset={handleTraitsPreset}
           />
-          <ModelsPanel models={models} />
+          <ModelsPanel models={{ ...models, L1: l1Status }} />
           <PipelineView runs={pipeline} />
         </aside>
       </div>

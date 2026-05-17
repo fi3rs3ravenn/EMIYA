@@ -6,15 +6,17 @@
  */
 
 const STATUS_LABELS = {
-  active:  'ACTIVE',
-  standby: 'STANDBY',
-  offline: 'OFFLINE',
+  active:   'ACTIVE',
+  awaiting: 'AWAIT',
+  standby:  'STANDBY',
+  offline:  'OFFLINE',
 };
 
 const STATUS_DOT = {
-  active:  '',
-  standby: 'standby',
-  offline: 'dim',
+  active:   '',
+  awaiting: 'awaiting',
+  standby:  'standby',
+  offline:  'dim',
 };
 
 const ROLES = {
