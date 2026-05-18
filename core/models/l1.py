@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 import requests
 
@@ -16,13 +17,23 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 _prompt_file = Path(__file__).parent.parent / "prompts" / "l1.txt"
 SYSTEM_PROMPT = _prompt_file.read_text(encoding="utf-8")
 STOP_TOKENS = GENERATION_STOP_MARKERS
+FACTUAL_PATTERNS = (
+    re.compile(r"^\s*what\s+(?:is|are)\s+the\s+", re.IGNORECASE),
+    re.compile(r"^\s*what\s+do\s+you\s+know\s+about\s+", re.IGNORECASE),
+    re.compile(r"^\s*tell\s+me\s+about\s+", re.IGNORECASE),
+    re.compile(r"^\s*who\s+(?:is|are|was|were)\s+", re.IGNORECASE),
+    re.compile(r"^\s*where\s+(?:is|are|was|were)\s+", re.IGNORECASE),
+    re.compile(r"^\s*when\s+(?:is|are|was|were|did|does)\s+", re.IGNORECASE),
+    re.compile(r"^\s*how\s+(?:far|many|much|old|long)\s+", re.IGNORECASE),
+    re.compile(r"\bdistance\s+(?:between|from)\b", re.IGNORECASE),
+)
 BASE_OPTIONS = {
     "temperature": 0.85,
     "top_p": 0.9,
     "top_k": 40,
     "repeat_penalty": 1.05,
     "num_predict": 900,
-    "num_ctx": 4096,
+    "num_ctx": 8192,
     "stop": list(STOP_TOKENS),
 }
 
@@ -102,7 +113,18 @@ def _build_system(context: dict | None) -> str:
     except Exception as e:
         print(f"[L1] traits injection error: {e}")
 
-    if context and ("recent_memory" in context or "relevant_memory" in context):
+    if context and context.get("factual_mode"):
+        blocks.append(
+            """
+<task_mode>
+factual question. answer the requested fact directly first.
+do not force continuity with previous topics.
+ignore memory unless the user explicitly asks about prior conversation.
+</task_mode>
+""".strip()
+        )
+
+    if context and not context.get("factual_mode") and ("recent_memory" in context or "relevant_memory" in context):
         try:
             from memory.retriever import build_memory_prompt_blocks
 
@@ -152,12 +174,42 @@ def _clean(text: str) -> str:
     return strip_generation_artifacts(text)
 
 
+def _is_factual_query(text: str) -> bool:
+    text = (text or "").strip()
+    if not text:
+        return False
+    return any(pattern.search(text) for pattern in FACTUAL_PATTERNS)
+
+
+def _latest_user_text(messages: list) -> str:
+    for msg in reversed(messages or []):
+        if msg.get("role") == "user":
+            return str(msg.get("content", ""))
+    return ""
+
+
+def _context_for_turn(context: dict | None, factual_mode: bool) -> dict | None:
+    if not context:
+        return {"factual_mode": True} if factual_mode else context
+    if not factual_mode:
+        return context
+
+    scoped = dict(context)
+    scoped["factual_mode"] = True
+    scoped["recent_memory"] = []
+    scoped["relevant_memory"] = []
+    return scoped
+
+
 def chat(messages: list, context: dict = None, return_metadata: bool = False) -> str | dict | None:
+    factual_mode = _is_factual_query(_latest_user_text(messages))
+    context = _context_for_turn(context, factual_mode)
     system = _build_system(context)
     options = _build_options(context)
 
     prompt_messages = []
-    for msg in messages[-6:]:
+    history = messages[-1:] if factual_mode else messages[-6:]
+    for msg in history:
         role = "user" if msg.get("role") == "user" else "assistant"
         content = msg.get("content", "")
         prompt_messages.append({"role": role, "content": content})
