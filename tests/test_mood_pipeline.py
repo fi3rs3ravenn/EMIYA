@@ -106,6 +106,51 @@ class MoodPipelineTests(unittest.TestCase):
         )
         self.assertNotEqual(payloads[0]["options"]["seed"], payloads[1]["options"]["seed"])
 
+    def test_l1_factual_queries_do_not_pull_history_or_memory_context(self):
+        context = {
+            "active_min": 10,
+            "apps": [{"app": "code.exe"}],
+            "activity_hints": states_to_activity_hints(["normal"]),
+            "mood": {"energy": 0.5, "focus": 0.5, "openness": 0.5},
+            "recent_memory": [
+                {
+                    "timestamp": "now",
+                    "type": "conversation",
+                    "content": "user: sqlite?\nemiya: memory layer needs relational stability.",
+                    "importance": 0.5,
+                }
+            ],
+            "relevant_memory": [
+                {
+                    "timestamp": "now",
+                    "type": "conversation",
+                    "content": "user: postgres?\nemiya: memory layer again.",
+                    "importance": 0.5,
+                }
+            ],
+        }
+        messages = [
+            {"role": "user", "content": "sqlite or postgres for emiya's memory layer?"},
+            {"role": "assistant", "content": "Postgres. If the memory layer needs to connect."},
+            {"role": "user", "content": "what do you know about project Artemis?"},
+        ]
+        payloads = []
+
+        def fake_post(url, json, timeout):
+            payloads.append(json)
+            return FakeResponse()
+
+        with patch.object(l1.requests, "post", side_effect=fake_post):
+            l1.chat(messages, context)
+
+        system = payloads[0]["messages"][0]["content"]
+        prompt_messages = payloads[0]["messages"][1:]
+
+        self.assertIn("<task_mode>", system)
+        self.assertIn("factual question", system)
+        self.assertNotIn("memory layer needs relational stability", system)
+        self.assertEqual(prompt_messages, [{"role": "user", "content": "what do you know about project Artemis?"}])
+
     def test_l1_runtime_context_does_not_duplicate_raw_mood_values(self):
         context = {
             "active_min": 10,
