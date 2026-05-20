@@ -151,6 +151,43 @@ class MoodPipelineTests(unittest.TestCase):
         self.assertNotIn("memory layer needs relational stability", system)
         self.assertEqual(prompt_messages, [{"role": "user", "content": "what do you know about project Artemis?"}])
 
+    def test_l1_proper_name_factual_followups_do_not_pull_memory_context(self):
+        context = {
+            "active_min": 10,
+            "apps": [{"app": "code.exe"}],
+            "activity_hints": states_to_activity_hints(["normal"]),
+            "mood": {"energy": 0.5, "focus": 0.5, "openness": 0.5},
+            "recent_memory": [
+                {
+                    "timestamp": "now",
+                    "type": "conversation",
+                    "content": "user: sqlite?\nemiya: memory layer needs relational stability.",
+                    "importance": 0.5,
+                }
+            ],
+            "relevant_memory": [],
+        }
+        messages = [
+            {"role": "user", "content": "sqlite or postgres for emiya's memory layer?"},
+            {"role": "assistant", "content": "Postgres. If the memory layer needs to connect."},
+            {"role": "user", "content": "okay what about Artemis?"},
+        ]
+        payloads = []
+
+        def fake_post(url, json, timeout):
+            payloads.append(json)
+            return FakeResponse()
+
+        with patch.object(l1.requests, "post", side_effect=fake_post):
+            l1.chat(messages, context)
+
+        system = payloads[0]["messages"][0]["content"]
+        prompt_messages = payloads[0]["messages"][1:]
+
+        self.assertIn("<task_mode>", system)
+        self.assertNotIn("memory layer needs relational stability", system)
+        self.assertEqual(prompt_messages, [{"role": "user", "content": "okay what about Artemis?"}])
+
     def test_l1_runtime_context_does_not_duplicate_raw_mood_values(self):
         context = {
             "active_min": 10,

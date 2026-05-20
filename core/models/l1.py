@@ -20,6 +20,7 @@ STOP_TOKENS = GENERATION_STOP_MARKERS
 FACTUAL_PATTERNS = (
     re.compile(r"^\s*what\s+(?:is|are)\s+the\s+", re.IGNORECASE),
     re.compile(r"^\s*what\s+do\s+you\s+know\s+about\s+", re.IGNORECASE),
+    re.compile(r"^\s*(?:[Oo][Kk](?:ay)?[, ]*)?(?:[Aa]nd\s+)?[Ww]hat\s+about\s+[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*){0,4}\??\s*$"),
     re.compile(r"^\s*tell\s+me\s+about\s+", re.IGNORECASE),
     re.compile(r"^\s*who\s+(?:is|are|was|were)\s+", re.IGNORECASE),
     re.compile(r"^\s*where\s+(?:is|are|was|were)\s+", re.IGNORECASE),
